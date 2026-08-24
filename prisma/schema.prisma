@@ -1,0 +1,84 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Business {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  leads Lead[]
+}
+
+enum PipelineStage {
+  NEW
+  QUALIFIED
+  QUOTE_SENT
+  WON
+  LOST
+}
+
+enum LeadSource {
+  MANUAL
+  EMAIL
+}
+
+model Lead {
+  id          String        @id @default(cuid())
+  businessId  String
+  business    Business      @relation(fields: [businessId], references: [id])
+  name        String
+  email       String?
+  phone       String?
+  company     String?
+  source      LeadSource    @default(MANUAL)
+  stage       PipelineStage @default(NEW)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  activities Activity[]
+  quotes     Quote[]
+
+  @@index([businessId])
+  @@index([stage])
+}
+
+enum ActivityType {
+  NOTE
+  STAGE_CHANGE
+  QUOTE_GENERATED
+}
+
+model Activity {
+  id         String       @id @default(cuid())
+  leadId     String
+  lead       Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type       ActivityType
+  note       String?
+  fromStage  PipelineStage?
+  toStage    PipelineStage?
+  reasonCode String?
+  createdAt  DateTime     @default(now())
+
+  @@index([leadId])
+}
+
+model Quote {
+  id            String   @id @default(cuid())
+  leadId        String
+  lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lineItems     String   // JSON-encoded array of { description, quantity, unitPrice }
+  totalAmount   Int      // stored in cents to avoid float rounding issues
+  currency      String   @default("USD")
+  generatedAt   DateTime @default(now())
+
+  @@index([leadId])
+}
