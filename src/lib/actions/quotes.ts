@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { MAX_LENGTHS, parseForgivingNumber } from "@/lib/validation";
 import type { QuoteLineItem } from "@/lib/pdf/quote-document";
+import { formatQuoteNumber } from "@/lib/quote-number";
+import { sendEmail } from "@/lib/email/send";
 
 export async function createQuote(leadId: string, formData: FormData) {
   const descriptions = formData.getAll("description").map(String);
@@ -28,9 +30,16 @@ export async function createQuote(leadId: string, formData: FormData) {
     0,
   );
 
+  const lastQuote = await prisma.quote.findFirst({
+    orderBy: { number: "desc" },
+    select: { number: true },
+  });
+  const number = (lastQuote?.number ?? 0) + 1;
+
   const quote = await prisma.quote.create({
     data: {
       leadId,
+      number,
       lineItems: JSON.stringify(lineItems),
       totalAmount,
       currency: "USD",
@@ -48,6 +57,54 @@ export async function createQuote(leadId: string, formData: FormData) {
     },
   });
 
+  await prisma.notification.create({
+    data: {
+      leadId,
+      quoteId: quote.id,
+      type: "QUOTE_SEND_PENDING",
+      message: `Quote #${formatQuoteNumber(number)} is ready to send to the customer.`,
+    },
+  });
+
   revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/", "layout");
   redirect(`/leads/${leadId}?quote=${quote.id}`);
+}
+
+export async function sendQuoteToCustomer(quoteId: string) {
+  const quote = await prisma.quote.findUniqueOrThrow({
+    where: { id: quoteId },
+    include: { lead: true },
+  });
+
+  if (!quote.lead.email) {
+    throw new Error("This lead doesn't have an email address on file to send the quote to.");
+  }
+
+  const number = formatQuoteNumber(quote.number ?? 0);
+  const result = await sendEmail({
+    to: quote.lead.email,
+    subject: `Your quote — #${number}`,
+    text: `Hi ${quote.lead.name}, please find your quote #${number} attached.`,
+  });
+
+  await prisma.$transaction([
+    prisma.quote.update({ where: { id: quote.id }, data: { sentAt: new Date() } }),
+    prisma.activity.create({
+      data: {
+        leadId: quote.leadId,
+        type: "NOTE",
+        note: result.delivered
+          ? `Quote #${number} emailed to ${quote.lead.email}.`
+          : `Quote #${number} approved to send to ${quote.lead.email} — no email provider is configured yet, so this wasn't actually delivered.`,
+      },
+    }),
+    prisma.notification.updateMany({
+      where: { quoteId: quote.id, read: false },
+      data: { read: true },
+    }),
+  ]);
+
+  revalidatePath(`/leads/${quote.leadId}`);
+  revalidatePath("/", "layout");
 }

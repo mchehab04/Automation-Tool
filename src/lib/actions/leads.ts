@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { STAGE_TRANSITIONS, REASON_CODES } from "@/lib/pipeline";
+import { generateClosingReport } from "@/lib/actions/lead-report";
 import {
   MAX_LENGTHS,
   isValidEmail,
@@ -58,6 +59,7 @@ export async function updateLeadStage(
   leadId: string,
   nextStage: PipelineStage,
   reasonCode?: string,
+  scheduledAt?: string,
 ) {
   const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId } });
 
@@ -73,10 +75,20 @@ export async function updateLeadStage(
     throw new Error(`A reason is required to move a lead to ${nextStage}.`);
   }
 
+  // Scheduling a service appointment requires an actual date/time — Won
+  // later means that appointment was completed and the car was returned.
+  let scheduledDate: Date | null = null;
+  if (nextStage === "SCHEDULED") {
+    scheduledDate = scheduledAt ? new Date(scheduledAt) : null;
+    if (!scheduledDate || Number.isNaN(scheduledDate.getTime())) {
+      throw new Error("Pick a date and time for the appointment.");
+    }
+  }
+
   await prisma.$transaction([
     prisma.lead.update({
       where: { id: leadId },
-      data: { stage: nextStage },
+      data: { stage: nextStage, scheduledAt: scheduledDate ?? undefined },
     }),
     prisma.activity.create({
       data: {
@@ -85,6 +97,9 @@ export async function updateLeadStage(
         fromStage: lead.stage,
         toStage: nextStage,
         reasonCode: requiredCodes ? reasonCode : null,
+        note: scheduledDate
+          ? `Service scheduled for ${scheduledDate.toLocaleString("en-US")}.`
+          : null,
       },
     }),
   ]);
@@ -92,6 +107,16 @@ export async function updateLeadStage(
   revalidatePath("/dashboard");
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
+
+  if (nextStage === "WON" || nextStage === "LOST") {
+    try {
+      await generateClosingReport(leadId, nextStage, reasonCode);
+      revalidatePath(`/leads/${leadId}`);
+    } catch (err) {
+      // A report failing to generate shouldn't block the lead actually closing.
+      console.error("Failed to generate closing report", err);
+    }
+  }
 }
 
 export async function addLeadNote(leadId: string, formData: FormData) {

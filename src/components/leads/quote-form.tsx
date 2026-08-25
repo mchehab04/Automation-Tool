@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,16 @@ const emptyRow = (): Row => ({
   touched: false,
 });
 
+export type SuggestedLineItem = { description: string; unitPrice: string };
+
+const suggestedRow = (item: SuggestedLineItem): Row => ({
+  id: nextId++,
+  description: item.description,
+  quantity: "1",
+  unitPrice: item.unitPrice,
+  touched: false,
+});
+
 function rowError(row: Row): string | undefined {
   if (row.description.trim().length === 0) return "Add a description.";
   if (row.description.length > MAX_LENGTHS.quoteDescription) {
@@ -32,8 +42,19 @@ function rowError(row: Row): string | undefined {
   return undefined;
 }
 
-export function QuoteForm({ leadId }: { leadId: string }) {
-  const [rows, setRows] = useState<Row[]>([emptyRow()]);
+export function QuoteForm({
+  leadId,
+  suggestedLineItems,
+}: {
+  leadId: string;
+  suggestedLineItems?: SuggestedLineItem[];
+}) {
+  const hasSuggestions = Boolean(suggestedLineItems && suggestedLineItems.length > 0);
+  const [rows, setRows] = useState<Row[]>(() =>
+    suggestedLineItems && suggestedLineItems.length > 0
+      ? suggestedLineItems.map(suggestedRow)
+      : [emptyRow()],
+  );
   const shakeRefs = useRef(new Map<number, HTMLDivElement>());
 
   const shakeRow = (id: number) => replayShake(shakeRefs.current.get(id) ?? null);
@@ -74,6 +95,12 @@ export function QuoteForm({ leadId }: { leadId: string }) {
       }}
       className="flex flex-col gap-4"
     >
+      {hasSuggestions ? (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Sparkles className="size-3.5" />
+          AI-suggested from the enquiry — review before generating.
+        </p>
+      ) : null}
       <div className="flex flex-col gap-3">
         {rows.map((row, i) => {
           const liveError = rowError(row);

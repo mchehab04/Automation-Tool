@@ -37,6 +37,29 @@ export function isValidPhone(raw: string): boolean {
   return digits.length >= 7 && digits.length <= 15;
 }
 
+// Common role-account local-parts that aren't a person's name — guessing a
+// name from these would be actively wrong, so leave the name blank instead.
+const GENERIC_EMAIL_LOCAL_PARTS = new Set([
+  "info", "sales", "support", "contact", "admin", "office", "hello",
+  "noreply", "no-reply", "service", "help", "enquiries", "inquiries", "team",
+]);
+
+// Best-effort fallback for when a customer gives an email but not their name
+// (e.g. "sarah.kim97@gmail.com" -> "Sarah Kim"). Returns "" when the local
+// part looks like a role account or doesn't contain anything name-like.
+export function guessNameFromEmail(email: string): string {
+  const local = email.split("@")[0]?.toLowerCase() ?? "";
+  if (GENERIC_EMAIL_LOCAL_PARTS.has(local)) return "";
+
+  const parts = local
+    .split(/[._+-]+/)
+    .map((part) => part.replace(/\d+$/, ""))
+    .filter((part) => part.length > 1);
+
+  if (parts.length === 0) return "";
+  return parts.map((part) => part[0].toUpperCase() + part.slice(1)).join(" ");
+}
+
 // Forgiving number/currency parsing: strips "$", ",", spaces so "$1,200.50"
 // and "1200.50" both parse the same way instead of one being rejected.
 export function parseForgivingNumber(raw: string): number {

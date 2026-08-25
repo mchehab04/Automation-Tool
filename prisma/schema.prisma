@@ -22,6 +22,9 @@ enum PipelineStage {
   NEW
   QUALIFIED
   QUOTE_SENT
+  // A service appointment has been booked — Won now means the service was
+  // completed and the car was returned, not just that the quote was accepted.
+  SCHEDULED
   WON
   LOST
 }
@@ -32,20 +35,28 @@ enum LeadSource {
 }
 
 model Lead {
-  id          String        @id @default(cuid())
-  businessId  String
-  business    Business      @relation(fields: [businessId], references: [id])
-  name        String
-  email       String?
-  phone       String?
-  company     String?
-  source      LeadSource    @default(MANUAL)
-  stage       PipelineStage @default(NEW)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id                 String        @id @default(cuid())
+  businessId         String
+  business           Business      @relation(fields: [businessId], references: [id])
+  name               String
+  email              String?
+  phone              String?
+  company            String?
+  source             LeadSource    @default(MANUAL)
+  stage              PipelineStage @default(NEW)
+  // JSON-encoded array of { description, unitPrice } suggested by AI email
+  // intake, offered as a starting point for the first quote — never applied
+  // without a human generating the quote themselves.
+  suggestedLineItems String?
+  // Booked appointment time, set when the lead moves to SCHEDULED.
+  scheduledAt        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
-  activities Activity[]
-  quotes     Quote[]
+  activities    Activity[]
+  quotes        Quote[]
+  messages      Message[]
+  notifications Notification[]
 
   @@index([businessId])
   @@index([stage])
@@ -55,6 +66,26 @@ enum ActivityType {
   NOTE
   STAGE_CHANGE
   QUOTE_GENERATED
+  REPORT
+}
+
+enum MessageRole {
+  CUSTOMER
+  BUSINESS
+}
+
+// Raw inbound/outbound conversation text for a lead (e.g. a simulated email
+// thread), kept separately from the Activity feed's human-facing summaries
+// so the underlying source material stays auditable.
+model Message {
+  id        String      @id @default(cuid())
+  leadId    String
+  lead      Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  role      MessageRole
+  text      String
+  createdAt DateTime    @default(now())
+
+  @@index([leadId])
 }
 
 model Activity {
@@ -73,12 +104,45 @@ model Activity {
 
 model Quote {
   id            String   @id @default(cuid())
+  // Sequential, human-facing quote number (e.g. for PDF filenames/invoice
+  // display) — distinct from `id`, which stays a cuid for internal use.
+  number        Int?     @unique
   leadId        String
   lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   lineItems     String   // JSON-encoded array of { description, quantity, unitPrice }
   totalAmount   Int      // stored in cents to avoid float rounding issues
   currency      String   @default("USD")
   generatedAt   DateTime @default(now())
+  // Set once the (simulated) "send to customer" approval fires.
+  sentAt        DateTime?
 
   @@index([leadId])
+}
+
+enum NotificationType {
+  // A new inbound message landed on a lead that already existed (matched by
+  // email/phone) — surfaced so staff know to check in, since it's not their
+  // first contact.
+  NEW_MESSAGE
+  // A quote was generated and is ready to be emailed to the customer.
+  QUOTE_SEND_PENDING
+}
+
+// In-app "needs your attention" queue, shown via the header bell icon —
+// keeps human-in-the-loop steps visible without staff having to babysit a
+// specific page.
+model Notification {
+  id        String           @id @default(cuid())
+  leadId    String
+  lead      Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  // Set only for QUOTE_SEND_PENDING, so approving one quote resolves
+  // precisely that notification rather than every pending one on the lead.
+  quoteId   String?
+  type      NotificationType
+  message   String
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([leadId])
+  @@index([read])
 }

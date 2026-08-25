@@ -6,16 +6,11 @@ import type { Stat } from "@/components/stats";
 import type { LeadsVolumeRow } from "@/components/leads-volume-chart";
 import type { SourceDatum } from "@/components/leads-by-source-chart";
 import { prisma } from "@/lib/db";
-import { PIPELINE_STAGES } from "@/lib/pipeline";
-import type { PipelineStage, LeadSource } from "@/generated/prisma/enums";
+import { PIPELINE_STAGES, LEAD_SOURCE_LABELS } from "@/lib/pipeline";
+import type { PipelineStage } from "@/generated/prisma/enums";
 
 const DEMO_BUSINESS_ID = "demo-business";
 const VOLUME_DAYS = 60;
-
-const SOURCE_LABELS: Record<LeadSource, string> = {
-  MANUAL: "Manual",
-  EMAIL: "Email",
-};
 
 function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -73,7 +68,7 @@ async function getLeadsBySource(): Promise<SourceDatum[]> {
   return grouped
     .map((row) => ({
       source: row.source,
-      label: SOURCE_LABELS[row.source],
+      label: LEAD_SOURCE_LABELS[row.source],
       count: row._count._all,
     }))
     .sort((a, b) => b.count - a.count);
@@ -117,7 +112,8 @@ export default async function DashboardPage() {
   ]);
 
   const totalLeads = PIPELINE_STAGES.reduce((sum, stage) => sum + stageCounts[stage], 0);
-  const activeLeads = stageCounts.NEW + stageCounts.QUALIFIED + stageCounts.QUOTE_SENT;
+  const activeLeads =
+    stageCounts.NEW + stageCounts.QUALIFIED + stageCounts.QUOTE_SENT + stageCounts.SCHEDULED;
   const winRate =
     stageCounts.WON + stageCounts.LOST > 0
       ? Math.round((stageCounts.WON / (stageCounts.WON + stageCounts.LOST)) * 100)

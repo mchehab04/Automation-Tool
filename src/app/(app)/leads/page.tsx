@@ -18,9 +18,14 @@ export default async function LeadsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
           <p className="text-sm text-muted-foreground">Move leads through the pipeline.</p>
         </div>
-        <Button render={<Link href="/leads/new" />} nativeButton={false}>
-          Add lead
-        </Button>
+        <div className="flex gap-2">
+          <Button render={<Link href="/leads/simulate" />} nativeButton={false} variant="outline">
+            Simulate email intake
+          </Button>
+          <Button render={<Link href="/leads/new" />} nativeButton={false}>
+            Add lead
+          </Button>
+        </div>
       </div>
       <KanbanBoard leads={leads} />
     </div>

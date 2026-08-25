@@ -1,9 +1,10 @@
-import type { PipelineStage } from "@/generated/prisma/enums";
+import type { PipelineStage, LeadSource } from "@/generated/prisma/enums";
 
 export const PIPELINE_STAGES: PipelineStage[] = [
   "NEW",
   "QUALIFIED",
   "QUOTE_SENT",
+  "SCHEDULED",
   "WON",
   "LOST",
 ];
@@ -12,6 +13,9 @@ export const STAGE_LABELS: Record<PipelineStage, string> = {
   NEW: "New",
   QUALIFIED: "Qualified",
   QUOTE_SENT: "Quote Sent",
+  SCHEDULED: "Scheduled",
+  // Won means the service was completed and the car was returned to the
+  // customer — not just that the quote was accepted.
   WON: "Won",
   LOST: "Lost",
 };
@@ -21,9 +25,15 @@ export const STAGE_LABELS: Record<PipelineStage, string> = {
 export const STAGE_TRANSITIONS: Record<PipelineStage, PipelineStage[]> = {
   NEW: ["QUALIFIED", "LOST"],
   QUALIFIED: ["QUOTE_SENT", "LOST"],
-  QUOTE_SENT: ["WON", "LOST"],
+  QUOTE_SENT: ["SCHEDULED", "LOST"],
+  SCHEDULED: ["WON", "LOST"],
   WON: [],
   LOST: [],
+};
+
+export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
+  MANUAL: "Manual",
+  EMAIL: "Email",
 };
 
 export type ReasonCode = { code: string; label: string };
@@ -34,8 +44,8 @@ export type ReasonCode = { code: string; label: string };
 export const REASON_CODES: Partial<Record<PipelineStage, ReasonCode[]>> = {
   WON: [
     { code: "price_fit", label: "Price was right" },
-    { code: "financing_approved", label: "Financing approved" },
-    { code: "trade_in_accepted", label: "Trade-in accepted" },
+    { code: "insurance_covered", label: "Insurance covered the repair" },
+    { code: "quick_availability", label: "Could fit them in quickly" },
     { code: "repeat_customer", label: "Repeat / referral customer" },
     { code: "other", label: "Other" },
   ],
@@ -43,7 +53,7 @@ export const REASON_CODES: Partial<Record<PipelineStage, ReasonCode[]>> = {
     { code: "price", label: "Price too high" },
     { code: "no_response", label: "Went unresponsive" },
     { code: "competitor", label: "Chose a competitor" },
-    { code: "financing_fell_through", label: "Financing fell through" },
+    { code: "parts_unavailable", label: "Needed parts weren't available in time" },
     { code: "timing", label: "Bad timing" },
     { code: "other", label: "Other" },
   ],

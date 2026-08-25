@@ -8,7 +8,8 @@ import { AppBreadcrumbs } from "@/components/app-breadcrumbs";
 import { CustomSidebarTrigger } from "@/components/custom-sidebar-trigger";
 import { navLinks } from "@/components/app-shared";
 import { NavUser } from "@/components/nav-user";
-import { SendIcon, BellIcon } from "lucide-react";
+import { NotificationBell } from "@/components/notification-bell";
+import { SendIcon } from "lucide-react";
 
 export function AppHeader() {
 	const pathname = usePathname();
@@ -33,10 +34,7 @@ export function AppHeader() {
 					<SendIcon
 					/>
 				</Button>
-				<Button aria-label="Notifications" size="icon-sm" variant="outline">
-					<BellIcon
-					/>
-				</Button>
+				<NotificationBell />
 				<Separator
 					className="h-4 data-[orientation=vertical]:self-center"
 					orientation="vertical"

@@ -1,4 +1,7 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { formatQuoteNumber } from "@/lib/quote-number";
+
+export { formatQuoteNumber };
 
 export type QuoteLineItem = {
   description: string;
@@ -7,7 +10,7 @@ export type QuoteLineItem = {
 };
 
 export type QuoteDocumentProps = {
-  quoteId: string;
+  quoteNumber: number;
   businessName: string;
   lead: { name: string; email: string | null; company: string | null };
   lineItems: QuoteLineItem[];
@@ -50,7 +53,7 @@ function formatMoney(cents: number, currency: string) {
 }
 
 export function QuoteDocument({
-  quoteId,
+  quoteNumber,
   businessName,
   lead,
   lineItems,
@@ -59,11 +62,11 @@ export function QuoteDocument({
   generatedAt,
 }: QuoteDocumentProps) {
   return (
-    <Document title={`Quote ${quoteId}`}>
+    <Document title={`Quote ${formatQuoteNumber(quoteNumber)}`}>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <Text style={styles.businessName}>{businessName}</Text>
-          <Text style={styles.meta}>Quote #{quoteId.slice(-8).toUpperCase()}</Text>
+          <Text style={styles.meta}>Quote #{formatQuoteNumber(quoteNumber)}</Text>
           <Text style={styles.meta}>Date: {generatedAt.toLocaleDateString("en-US")}</Text>
         </View>
 

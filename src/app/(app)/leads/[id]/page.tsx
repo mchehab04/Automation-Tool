@@ -1,14 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FileText, ArrowLeft, Mail, Phone, Building2 } from "lucide-react";
+import { FileText, ArrowLeft, Mail, Phone, Building2, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StageSelect } from "@/components/leads/stage-select";
-import { QuoteForm } from "@/components/leads/quote-form";
+import { QuoteForm, type SuggestedLineItem } from "@/components/leads/quote-form";
+import { SendQuoteButton } from "@/components/leads/send-quote-button";
+import { formatQuoteNumber } from "@/lib/quote-number";
 import { NoteForm } from "@/components/leads/note-form";
 import { prisma } from "@/lib/db";
-import { STAGE_LABELS, getReasonLabel, stageBadgeVariant, stageBadgeClassName } from "@/lib/pipeline";
+import {
+  STAGE_LABELS,
+  LEAD_SOURCE_LABELS,
+  getReasonLabel,
+  stageBadgeVariant,
+  stageBadgeClassName,
+} from "@/lib/pipeline";
 
 export default async function LeadDetailPage({
   params,
@@ -22,10 +30,19 @@ export default async function LeadDetailPage({
     include: {
       activities: { orderBy: { createdAt: "desc" } },
       quotes: { orderBy: { generatedAt: "desc" } },
+      messages: { orderBy: { createdAt: "asc" } },
     },
   });
 
   if (!lead) notFound();
+
+  const suggestedLineItems: SuggestedLineItem[] =
+    lead.quotes.length === 0 && lead.suggestedLineItems
+      ? (JSON.parse(lead.suggestedLineItems) as SuggestedLineItem[])
+      : [];
+
+  const reportActivity = lead.activities.find((a) => a.type === "REPORT");
+  const timelineActivities = lead.activities.filter((a) => a.type !== "REPORT");
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
@@ -41,9 +58,14 @@ export default async function LeadDetailPage({
             <h1 className="text-2xl font-semibold tracking-tight">{lead.name}</h1>
             {lead.company ? <p className="text-sm text-muted-foreground">{lead.company}</p> : null}
           </div>
-          <Badge variant={stageBadgeVariant(lead.stage)} className={stageBadgeClassName(lead.stage)}>
-            {STAGE_LABELS[lead.stage]}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {lead.source !== "MANUAL" ? (
+              <Badge variant="outline">{LEAD_SOURCE_LABELS[lead.source]}</Badge>
+            ) : null}
+            <Badge variant={stageBadgeVariant(lead.stage)} className={stageBadgeClassName(lead.stage)}>
+              {STAGE_LABELS[lead.stage]}
+            </Badge>
+          </div>
         </div>
       </div>
 
@@ -80,7 +102,12 @@ export default async function LeadDetailPage({
               <CardTitle>Stage</CardTitle>
               <CardDescription>Move this lead forward or mark it lost.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-col gap-3">
+              {lead.scheduledAt ? (
+                <p className="text-sm text-muted-foreground">
+                  Appointment: {lead.scheduledAt.toLocaleString("en-US")}
+                </p>
+              ) : null}
               <StageSelect leadId={lead.id} stage={lead.stage} />
             </CardContent>
           </Card>
@@ -93,32 +120,90 @@ export default async function LeadDetailPage({
               {lead.quotes.length > 0 && (
                 <ul className="flex flex-col gap-2">
                   {lead.quotes.map((quote) => (
-                    <li key={quote.id} className="flex items-center justify-between text-sm">
-                      <span>
-                        {(quote.totalAmount / 100).toLocaleString("en-US", {
-                          style: "currency",
-                          currency: quote.currency,
-                        })}{" "}
-                        <span className="text-muted-foreground">
-                          — {quote.generatedAt.toLocaleDateString("en-US")}
+                    <li key={quote.id} className="flex flex-col gap-2 border-b pb-2 text-sm last:border-b-0 last:pb-0">
+                      <div className="flex items-center justify-between">
+                        <span>
+                          <span className="text-muted-foreground">
+                            #{formatQuoteNumber(quote.number ?? 0)}
+                          </span>{" "}
+                          {(quote.totalAmount / 100).toLocaleString("en-US", {
+                            style: "currency",
+                            currency: quote.currency,
+                          })}{" "}
+                          <span className="text-muted-foreground">
+                            — {quote.generatedAt.toLocaleDateString("en-US")}
+                          </span>
                         </span>
-                      </span>
-                      <Button
-                        render={<a href={`/api/quotes/${quote.id}/pdf`} target="_blank" rel="noreferrer" />}
-                        nativeButton={false}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <FileText className="size-4" /> PDF
-                      </Button>
+                        <Button
+                          render={<a href={`/api/quotes/${quote.id}/pdf`} target="_blank" rel="noreferrer" />}
+                          nativeButton={false}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <FileText className="size-4" /> PDF
+                        </Button>
+                      </div>
+                      {quote.sentAt ? (
+                        <p className="text-xs text-muted-foreground">
+                          Sent to customer {quote.sentAt.toLocaleString("en-US")}
+                        </p>
+                      ) : (
+                        <SendQuoteButton quoteId={quote.id} />
+                      )}
                     </li>
                   ))}
                 </ul>
               )}
-              <QuoteForm leadId={lead.id} />
+              <QuoteForm leadId={lead.id} suggestedLineItems={suggestedLineItems} />
             </CardContent>
           </Card>
+
+          {lead.messages.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Conversation</CardTitle>
+                <CardDescription>Raw thread this lead was created from.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="flex flex-col gap-2">
+                  {lead.messages.map((message) => (
+                    <li
+                      key={message.id}
+                      className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                        message.role === "CUSTOMER"
+                          ? "self-start bg-muted"
+                          : "self-end ml-auto bg-primary text-primary-foreground"
+                      }`}
+                    >
+                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wide opacity-70">
+                        {message.role === "CUSTOMER" ? "Customer" : "Business"}
+                      </p>
+                      {message.text}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
+
+        <div className="flex flex-col gap-6">
+          {reportActivity ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="size-4" /> Closing report
+                </CardTitle>
+                <CardDescription>
+                  Generated automatically when this lead closed, from its notes,
+                  conversation, and quotes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-line">{reportActivity.note}</p>
+              </CardContent>
+            </Card>
+          ) : null}
 
         <Card>
           <CardHeader>
@@ -127,7 +212,7 @@ export default async function LeadDetailPage({
           <CardContent className="flex flex-col gap-4">
             <NoteForm leadId={lead.id} />
             <ul className="flex flex-col gap-3 border-t pt-4">
-              {lead.activities.map((activity) => (
+              {timelineActivities.map((activity) => (
                 <li key={activity.id} className="text-sm">
                   <p className="text-xs text-muted-foreground">
                     {activity.createdAt.toLocaleString("en-US")}
@@ -148,6 +233,9 @@ export default async function LeadDetailPage({
                           — {getReasonLabel(activity.toStage, activity.reasonCode)}
                         </span>
                       ) : null}
+                      {activity.note ? (
+                        <span className="block text-muted-foreground">{activity.note}</span>
+                      ) : null}
                     </p>
                   ) : (
                     <p>{activity.note}</p>
@@ -157,6 +245,7 @@ export default async function LeadDetailPage({
             </ul>
           </CardContent>
         </Card>
+        </div>
       </div>
     </div>
   );
