@@ -13,7 +13,7 @@ import { extractEnquiry } from "@/lib/intake/extract-enquiry";
 import {
   findExistingLeadByContact,
   buildSuggestedLineItems,
-  mergeSuggestedLineItems,
+  type SuggestedLineItem,
 } from "@/lib/intake/lead-matching";
 import { withImapConnection, type ImapUnavailable } from "@/lib/gmail/imap-client";
 import { parseRawMessage } from "@/lib/gmail/parse-message";
@@ -74,16 +74,40 @@ async function processOneMessage(
   summary.processed++;
   const email = parsed.fromEmail;
 
-  const threadText = `Subject: ${parsed.subject}\n\n${parsed.text}`;
-  const data = await extractEnquiry(threadText, "real");
+  // Known from the header before any AI call, unlike phone (which only ever
+  // comes from the message body) — so the lookup can happen up front and its
+  // history/existing suggestions can be given to the model as context.
+  const existingLead = await findExistingLeadByContact(DEMO_BUSINESS_ID, { email });
+  const priorSuggestions: SuggestedLineItem[] = existingLead?.suggestedLineItems
+    ? JSON.parse(existingLead.suggestedLineItems)
+    : [];
+
+  // Full prior conversation, not just the latest message — otherwise a reply
+  // like "yes that works for me" has nothing for the model to resolve
+  // "that" against. Business-side messages are only present here if they
+  // were actually sent via sendPendingReply (see reply.ts); the simulator's
+  // own approve-flow never touches this lead's Message history in real
+  // intake's case, so there's nothing else to miss.
+  const priorMessages = existingLead
+    ? await prisma.message.findMany({
+        where: { leadId: existingLead.id },
+        orderBy: { createdAt: "asc" },
+      })
+    : [];
+  const priorThreadText = priorMessages
+    .map((m) => `${m.role === "CUSTOMER" ? "Customer" : "Business"}: ${m.text}`)
+    .join("\n\n");
+
+  const threadText = priorThreadText
+    ? `${priorThreadText}\n\nCustomer: ${parsed.text}`
+    : `Subject: ${parsed.subject}\n\nCustomer: ${parsed.text}`;
+  const data = await extractEnquiry(threadText, "real", priorSuggestions);
 
   if (!data.is_enquiry) {
     summary.skippedNotEnquiry++;
     await markSeen(client, uid);
     return;
   }
-
-  const existingLead = await findExistingLeadByContact(DEMO_BUSINESS_ID, { email });
 
   const phoneRaw = data.phone.trim();
   const phone = phoneRaw && isValidPhone(phoneRaw) ? normalizePhone(phoneRaw) : "";
@@ -118,7 +142,11 @@ async function processOneMessage(
   const draftReply = data.draft_reply.trim();
   const clarifyingNote = draftReply ? ` A clarifying question worth asking: "${draftReply}"` : "";
 
-  const newSuggestedLineItems = buildSuggestedLineItems(data.suggested_line_items);
+  // The model was given whatever was already drafted and asked to return the
+  // full corrected picture, not just an addition — so this replaces rather
+  // than merges, which is what actually fixes a follow-up that clarifies
+  // (not just adds to) an earlier vague item.
+  const updatedSuggestedLineItems = buildSuggestedLineItems(data.suggested_line_items);
   const messageData = {
     role: "CUSTOMER" as const,
     text: parsed.text.slice(0, 2000),
@@ -131,17 +159,13 @@ async function processOneMessage(
         0,
         MAX_LENGTHS.note,
       );
-      const mergedSuggestions = mergeSuggestedLineItems(
-        existingLead.suggestedLineItems,
-        newSuggestedLineItems,
-      );
-
       await prisma.$transaction([
         prisma.lead.update({
           where: { id: existingLead.id },
           data: {
             messages: { create: messageData },
-            suggestedLineItems: mergedSuggestions.length > 0 ? JSON.stringify(mergedSuggestions) : undefined,
+            suggestedLineItems:
+              updatedSuggestedLineItems.length > 0 ? JSON.stringify(updatedSuggestedLineItems) : undefined,
             // Replaced, not merged — a reply is one current draft, not a list.
             pendingReplyText: draftReply || undefined,
           },
@@ -182,7 +206,8 @@ async function processOneMessage(
           phone: phone || null,
           company: company || null,
           source: "EMAIL",
-          suggestedLineItems: newSuggestedLineItems.length > 0 ? JSON.stringify(newSuggestedLineItems) : null,
+          suggestedLineItems:
+            updatedSuggestedLineItems.length > 0 ? JSON.stringify(updatedSuggestedLineItems) : null,
           pendingReplyText: draftReply || null,
           activities: { create: [{ type: "NOTE", note }] },
           messages: { create: messageData },

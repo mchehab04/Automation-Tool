@@ -22,12 +22,13 @@ const emptyRow = (): Row => ({
   touched: false,
 });
 
-export type SuggestedLineItem = { description: string; unitPrice: string };
+export type SuggestedLineItem = { description: string; quantity: string; unitPrice: string };
 
 const suggestedRow = (item: SuggestedLineItem): Row => ({
   id: nextId++,
   description: item.description,
-  quantity: "1",
+  // Fall back to "1" for suggestions saved before quantity was tracked.
+  quantity: item.quantity || "1",
   unitPrice: item.unitPrice,
   touched: false,
 });

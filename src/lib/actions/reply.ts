@@ -47,6 +47,10 @@ export async function sendPendingReply(leadId: string, text: string) {
   await prisma.$transaction([
     prisma.lead.update({ where: { id: leadId }, data: { pendingReplyText: null } }),
     prisma.activity.create({ data: { leadId, type: "NOTE", note } }),
+    // Recorded even when only simulated (not actually delivered), so the
+    // conversation history AI context is built from later reflects what
+    // staff approved, not just what the customer sent.
+    prisma.message.create({ data: { leadId, role: "BUSINESS", text: trimmed } }),
     prisma.notification.updateMany({
       where: { leadId, type: "REPLY_SEND_PENDING", read: false },
       data: { read: true },

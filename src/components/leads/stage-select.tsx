@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -11,9 +12,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateLeadStage } from "@/lib/actions/leads";
+import { getAvailableSlots, type AvailableDay } from "@/lib/actions/scheduling";
 import { STAGE_LABELS, STAGE_TRANSITIONS, REASON_CODES } from "@/lib/pipeline";
 import { cn } from "@/lib/utils";
 import type { PipelineStage } from "@/generated/prisma/enums";
@@ -22,8 +23,25 @@ export function StageSelect({ leadId, stage }: { leadId: string; stage: Pipeline
   const [isPending, startTransition] = useTransition();
   const [pendingStage, setPendingStage] = useState<PipelineStage | null>(null);
   const [reasonCode, setReasonCode] = useState<string | null>(null);
-  const [scheduledAt, setScheduledAt] = useState("");
+  // null = not loaded yet (covers both "hasn't fetched" and "still fetching").
+  const [availableDays, setAvailableDays] = useState<AvailableDay[] | null>(null);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedTime, setSelectedTime] = useState("");
   const nextStages = STAGE_TRANSITIONS[stage];
+
+  const isScheduling = pendingStage === "SCHEDULED";
+  const loadingSlots = isScheduling && availableDays === null;
+
+  useEffect(() => {
+    if (!isScheduling) return;
+    let cancelled = false;
+    getAvailableSlots().then((days) => {
+      if (!cancelled) setAvailableDays(days);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isScheduling]);
 
   if (nextStages.length === 0) {
     return (
@@ -40,7 +58,9 @@ export function StageSelect({ leadId, stage }: { leadId: string; stage: Pipeline
   const closeDialog = () => {
     setPendingStage(null);
     setReasonCode(null);
-    setScheduledAt("");
+    setAvailableDays(null);
+    setSelectedDate("");
+    setSelectedTime("");
   };
 
   const handleSelect = (value: PipelineStage) => {
@@ -49,7 +69,6 @@ export function StageSelect({ leadId, stage }: { leadId: string; stage: Pipeline
     if (REASON_CODES[value] || value === "SCHEDULED") {
       setPendingStage(value);
       setReasonCode(null);
-      setScheduledAt("");
     } else {
       commit(value);
     }
@@ -62,13 +81,13 @@ export function StageSelect({ leadId, stage }: { leadId: string; stage: Pipeline
   };
 
   const confirmSchedule = () => {
-    if (!pendingStage || !scheduledAt) return;
-    commit(pendingStage, undefined, scheduledAt);
+    if (!pendingStage || !selectedTime) return;
+    commit(pendingStage, undefined, selectedTime);
     closeDialog();
   };
 
   const reasonOptions = pendingStage ? REASON_CODES[pendingStage] ?? [] : [];
-  const isScheduling = pendingStage === "SCHEDULED";
+  const timeOptions = availableDays?.find((d) => d.date === selectedDate)?.slots ?? [];
 
   return (
     <>
@@ -100,20 +119,63 @@ export function StageSelect({ leadId, stage }: { leadId: string; stage: Pipeline
                   returned — this just books the slot.
                 </DialogDescription>
               </DialogHeader>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="scheduledAt">Date &amp; time</Label>
-                <Input
-                  id="scheduledAt"
-                  type="datetime-local"
-                  value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                />
-              </div>
+              {loadingSlots ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" /> Checking availability…
+                </p>
+              ) : !availableDays || availableDays.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No open slots in the next week — every business-hours slot is booked.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="scheduleDate">Date</Label>
+                    <Select
+                      value={selectedDate}
+                      onValueChange={(value) => {
+                        setSelectedDate(value ?? "");
+                        setSelectedTime("");
+                      }}
+                    >
+                      <SelectTrigger id="scheduleDate" className="w-full">
+                        <SelectValue placeholder="Pick a date" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableDays.map((day) => (
+                          <SelectItem key={day.date} value={day.date}>
+                            {day.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="scheduleTime">Time</Label>
+                    <Select
+                      value={selectedTime}
+                      onValueChange={(value) => setSelectedTime(value ?? "")}
+                      disabled={!selectedDate}
+                    >
+                      <SelectTrigger id="scheduleTime" className="w-full">
+                        <SelectValue placeholder="Pick a time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((slot) => (
+                          <SelectItem key={slot.value} value={slot.value}>
+                            {slot.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
               <DialogFooter>
                 <Button variant="outline" onClick={closeDialog}>
                   Cancel
                 </Button>
-                <Button onClick={confirmSchedule} disabled={!scheduledAt}>
+                <Button onClick={confirmSchedule} disabled={!selectedTime}>
                   Confirm
                 </Button>
               </DialogFooter>

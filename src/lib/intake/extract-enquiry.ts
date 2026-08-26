@@ -4,6 +4,12 @@ const MODEL = "claude-sonnet-5";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+export type ExtractedSuggestedLineItem = {
+  description: string;
+  quantity: string;
+  estimated_price: string;
+};
+
 export type ExtractedEnquiry = {
   is_enquiry: boolean;
   name: string;
@@ -12,7 +18,7 @@ export type ExtractedEnquiry = {
   company: string;
   summary: string;
   draft_reply: string;
-  suggested_line_items: { description: string; estimated_price: string }[];
+  suggested_line_items: ExtractedSuggestedLineItem[];
 };
 
 const EXTRACT_TOOL = {
@@ -43,17 +49,27 @@ const EXTRACT_TOOL = {
       suggested_line_items: {
         type: "array" as const,
         description:
-          "A rough starting point for a quote, based only on what the customer described (e.g. a diagnostic inspection for a described symptom). Empty array if there isn't enough to go on, or if is_enquiry is false. These are drafts a human reviews before any quote is sent — do not try to be precise about pricing.",
+          "A rough starting point for a quote, based only on what the customer described (e.g. a diagnostic inspection for a described symptom). Empty array if there isn't enough to go on, or if is_enquiry is false. These are drafts a human reviews before any quote is sent — do not try to be precise about pricing. " +
+          "If the message thread includes an \"Already drafted for this quote\" section, that reflects everything suggested so far — return the FULL corrected list, not just what's new: fold in what the latest message adds, replace or correct any item the latest message clarifies (e.g. a vague \"wheel change\" followed up with \"replace 2 rear tires\" is the SAME job, not two separate line items), and keep anything still relevant. Don't just append.",
         items: {
           type: "object" as const,
           properties: {
-            description: { type: "string" as const },
+            description: {
+              type: "string" as const,
+              description:
+                "Describe ONE unit of the item/service, generically, in singular form — never state a count in the words themselves. This applies to any kind of enquiry, not just parts that come in pairs: write \"Oil change\", \"Rear tire replacement\", \"Brake pad (front)\", \"Wiper blade\", \"Diagnostic inspection\" — never \"2 oil changes\", \"Replace 2 rear tires\", \"4 brake pads\", \"Pair of wiper blades\". The count belongs ONLY in the quantity field below, never duplicated into this text.",
+            },
+            quantity: {
+              type: "string" as const,
+              description: "How many of that single unit, digits only, e.g. \"2\". \"1\" if not specified or not applicable.",
+            },
             estimated_price: {
               type: "string" as const,
-              description: "Rough estimate in whole USD, digits only, e.g. \"120\".",
+              description:
+                "Rough estimate in whole USD for ONE unit only (never the line total for all of them) — digits only, e.g. \"120\". If the customer or a stated price covers multiple units (e.g. \"$300 for both rear tires\"), divide by quantity first: quantity \"2\", this field \"150\" — not \"300\".",
             },
           },
-          required: ["description", "estimated_price"],
+          required: ["description", "quantity", "estimated_price"],
         },
       },
     },
@@ -91,15 +107,27 @@ const SYSTEM_PROMPTS = {
     "friendly clarifying question.",
 } as const;
 
+export type ExistingSuggestion = { description: string; quantity: string; unitPrice: string };
+
 export async function extractEnquiry(
   threadText: string,
   mode: keyof typeof SYSTEM_PROMPTS,
+  existingSuggestions?: ExistingSuggestion[],
 ): Promise<ExtractedEnquiry> {
+  const existingSuggestionsBlock =
+    existingSuggestions && existingSuggestions.length > 0
+      ? `\n\nAlready drafted for this quote (from earlier messages):\n${existingSuggestions
+          .map((item) => `- ${item.description} (qty ${item.quantity}, ~$${item.unitPrice} each)`)
+          .join("\n")}`
+      : "";
+
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 1024,
     system: SYSTEM_PROMPTS[mode],
-    messages: [{ role: "user", content: `Message thread:\n\n${threadText}` }],
+    messages: [
+      { role: "user", content: `Message thread:\n\n${threadText}${existingSuggestionsBlock}` },
+    ],
     tools: [EXTRACT_TOOL],
     tool_choice: { type: "tool", name: "record_enquiry" },
   });

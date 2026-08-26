@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/db";
 import { MAX_LENGTHS, parseForgivingNumber } from "@/lib/validation";
+import type { ExtractedSuggestedLineItem } from "@/lib/intake/extract-enquiry";
 
-export type SuggestedLineItem = { description: string; unitPrice: string };
+export type SuggestedLineItem = { description: string; quantity: string; unitPrice: string };
 
 // A returning customer identified by email/phone continues their existing
 // lead instead of spawning a duplicate.
@@ -22,11 +23,12 @@ export async function findExistingLeadByContact(
 }
 
 export function buildSuggestedLineItems(
-  items: { description: string; estimated_price: string }[],
+  items: ExtractedSuggestedLineItem[],
 ): SuggestedLineItem[] {
   return items
     .map((item) => ({
       description: item.description.trim().slice(0, MAX_LENGTHS.quoteDescription),
+      quantity: String(Math.max(1, Math.round(parseForgivingNumber(item.quantity) || 1))),
       unitPrice: String(Math.max(0, Math.round(parseForgivingNumber(item.estimated_price)))),
     }))
     .filter((item) => item.description.length > 0);
