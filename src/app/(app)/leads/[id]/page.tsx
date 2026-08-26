@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { StageSelect } from "@/components/leads/stage-select";
 import { QuoteForm, type SuggestedLineItem } from "@/components/leads/quote-form";
 import { SendQuoteButton } from "@/components/leads/send-quote-button";
+import { PendingReplyCard } from "@/components/leads/pending-reply-card";
 import { formatQuoteNumber } from "@/lib/quote-number";
 import { NoteForm } from "@/components/leads/note-form";
 import { prisma } from "@/lib/db";
@@ -36,10 +37,11 @@ export default async function LeadDetailPage({
 
   if (!lead) notFound();
 
-  const suggestedLineItems: SuggestedLineItem[] =
-    lead.quotes.length === 0 && lead.suggestedLineItems
-      ? (JSON.parse(lead.suggestedLineItems) as SuggestedLineItem[])
-      : [];
+  // suggestedLineItems is cleared once acted on (see createQuote), so its
+  // mere presence means "pending draft" — no need to also check quote count.
+  const suggestedLineItems: SuggestedLineItem[] = lead.suggestedLineItems
+    ? (JSON.parse(lead.suggestedLineItems) as SuggestedLineItem[])
+    : [];
 
   const reportActivity = lead.activities.find((a) => a.type === "REPORT");
   const timelineActivities = lead.activities.filter((a) => a.type !== "REPORT");
@@ -188,6 +190,10 @@ export default async function LeadDetailPage({
         </div>
 
         <div className="flex flex-col gap-6">
+          {lead.pendingReplyText ? (
+            <PendingReplyCard leadId={lead.id} draft={lead.pendingReplyText} />
+          ) : null}
+
           {reportActivity ? (
             <Card>
               <CardHeader>

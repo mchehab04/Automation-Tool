@@ -45,3 +45,14 @@ next-env.d.ts
 # SQLite local dev database
 *.db
 *.db-journal
+
+# scrape-leads skill: scraped lead data (real business contact info,
+# never belongs in git history) and Google/OAuth credential files
+.tmp/
+service_account.json
+credentials.json
+token.json
+token.pickle
+
+# Python venv for the scrape-leads skill scripts
+.venv/

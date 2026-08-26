@@ -60,6 +60,17 @@ export function guessNameFromEmail(email: string): string {
   return parts.map((part) => part[0].toUpperCase() + part.slice(1)).join(" ");
 }
 
+// Models sometimes return a placeholder string instead of following the "empty
+// string if unknown" instruction (e.g. "<UNKNOWN>", "N/A", "None"). Treat these
+// the same as an actually-empty value rather than letting them through as real
+// data — this is what let a lead get created named "<UNKNOWN>".
+const PLACEHOLDER_TEXT_RE =
+  /^[<[]?\s*(unknown|n\/?a|none|null|not[\s-](?:provided|given|specified|available)|no (?:name|info(?:rmation)?) (?:given|provided))\s*[>\]]?$/i;
+
+export function isPlaceholderText(value: string): boolean {
+  return PLACEHOLDER_TEXT_RE.test(value.trim());
+}
+
 // Forgiving number/currency parsing: strips "$", ",", spaces so "$1,200.50"
 // and "1200.50" both parse the same way instead of one being rejected.
 export function parseForgivingNumber(raw: string): number {

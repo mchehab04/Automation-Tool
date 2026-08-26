@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Business {
@@ -48,6 +48,10 @@ model Lead {
   // intake, offered as a starting point for the first quote — never applied
   // without a human generating the quote themselves.
   suggestedLineItems String?
+  // AI-drafted clarifying reply awaiting staff review (real Gmail intake
+  // only) — cleared once accepted/sent via sendPendingReply. Replaced, not
+  // merged, on a new message: a reply is one current draft, not a list.
+  pendingReplyText   String?
   // Booked appointment time, set when the lead moves to SCHEDULED.
   scheduledAt        DateTime?
   createdAt          DateTime      @default(now())
@@ -83,6 +87,10 @@ model Message {
   lead      Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
   role      MessageRole
   text      String
+  // RFC Message-ID header for real inbound email — makes intake idempotent
+  // against reprocessing (e.g. an IMAP \Seen flag not getting set in time).
+  // NULL for simulated messages, which have no such header.
+  externalId String?     @unique
   createdAt DateTime    @default(now())
 
   @@index([leadId])
@@ -120,12 +128,16 @@ model Quote {
 }
 
 enum NotificationType {
+  // A brand-new lead was created from an inbound message (simulated or real).
+  NEW_LEAD
   // A new inbound message landed on a lead that already existed (matched by
   // email/phone) — surfaced so staff know to check in, since it's not their
   // first contact.
   NEW_MESSAGE
   // A quote was generated and is ready to be emailed to the customer.
   QUOTE_SEND_PENDING
+  // Real Gmail intake drafted a clarifying reply awaiting staff review.
+  REPLY_SEND_PENDING
 }
 
 // In-app "needs your attention" queue, shown via the header bell icon —

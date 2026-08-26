@@ -1,10 +1,14 @@
 import "dotenv/config";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
+import { setDefaultResultOrder } from "node:dns";
+import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 
-const adapter = new PrismaLibSql({
-  url: process.env.DATABASE_URL ?? "file:./dev.db",
-});
+// See src/lib/db.ts for why this is here.
+setDefaultResultOrder("ipv4first");
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 const DEMO_LEADS: Array<{
