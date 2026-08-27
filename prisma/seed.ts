@@ -29,11 +29,31 @@ const DEMO_LEADS: Array<{
   { name: "Elena Popescu", email: "elena@popescucatering.ro", company: "Popescu Catering", stage: "LOST", daysAgo: 18 },
 ];
 
+const DEMO_CATALOG_ITEMS: Array<{ description: string; unitPriceDollars: number }> = [
+  { description: "Oil change", unitPriceDollars: 65 },
+  { description: "Front brake pad replacement", unitPriceDollars: 220 },
+  { description: "Rear brake pad replacement", unitPriceDollars: 200 },
+  { description: "Tire rotation", unitPriceDollars: 40 },
+  { description: "Battery replacement", unitPriceDollars: 180 },
+  { description: "Diagnostic inspection", unitPriceDollars: 95 },
+];
+
 async function main() {
   const business = await prisma.business.upsert({
     where: { id: "demo-business" },
     update: {},
     create: { id: "demo-business", name: "Demo Business" },
+  });
+
+  // Delete-then-recreate keeps this safely re-runnable without needing a
+  // uniqueness constraint on (businessId, description).
+  await prisma.serviceCatalogItem.deleteMany({ where: { businessId: business.id } });
+  await prisma.serviceCatalogItem.createMany({
+    data: DEMO_CATALOG_ITEMS.map((item) => ({
+      businessId: business.id,
+      description: item.description,
+      unitPrice: Math.round(item.unitPriceDollars * 100),
+    })),
   });
 
   for (const demo of DEMO_LEADS) {
@@ -73,7 +93,9 @@ async function main() {
     }
   }
 
-  console.log(`Seeded business "${business.name}" with ${DEMO_LEADS.length} leads.`);
+  console.log(
+    `Seeded business "${business.name}" with ${DEMO_LEADS.length} leads and ${DEMO_CATALOG_ITEMS.length} catalog items.`,
+  );
 }
 
 main()

@@ -14,9 +14,11 @@ import {
 import { extractEnquiry } from "@/lib/intake/extract-enquiry";
 import {
   findExistingLeadByContact,
+  findMostRecentClosedLead,
   buildSuggestedLineItems,
   mergeSuggestedLineItems,
 } from "@/lib/intake/lead-matching";
+import { STAGE_LABELS } from "@/lib/pipeline";
 
 const DEMO_BUSINESS_ID = "demo-business";
 
@@ -44,15 +46,24 @@ export async function processSimulatedEmail(
   const phoneRaw = data.phone.trim();
   const email = emailRaw && isValidEmail(emailRaw) ? normalizeEmail(emailRaw) : "";
   const phone = phoneRaw && isValidPhone(phoneRaw) ? normalizePhone(phoneRaw) : "";
-  const companyRaw = data.company.trim();
-  const company = !isPlaceholderText(companyRaw) ? companyRaw.slice(0, MAX_LENGTHS.company) : "";
-
   const existingLead = await findExistingLeadByContact(DEMO_BUSINESS_ID, { email, phone });
+  // Only relevant when there's no open lead to continue — a returning
+  // customer whose prior engagement already closed gets a fresh lead,
+  // linked back to this one for history.
+  const closedLead = existingLead
+    ? null
+    : await findMostRecentClosedLead(DEMO_BUSINESS_ID, { email, phone });
+
+  const companyRaw = data.company.trim();
+  const company =
+    companyRaw && !isPlaceholderText(companyRaw)
+      ? companyRaw.slice(0, MAX_LENGTHS.company)
+      : closedLead?.company || "";
 
   const nameRaw = data.name.trim();
   const extractedName = !isPlaceholderText(nameRaw) ? nameRaw.slice(0, MAX_LENGTHS.name) : "";
   const guessedName = !extractedName && email ? guessNameFromEmail(email) : "";
-  const name = extractedName || existingLead?.name || guessedName;
+  const name = extractedName || existingLead?.name || closedLead?.name || guessedName;
 
   // Deterministic gate — don't just trust the model's own read of what's missing.
   const missingFields: string[] = [];
@@ -120,10 +131,16 @@ export async function processSimulatedEmail(
     };
   }
 
-  const nameNote = guessedName
-    ? ` Name inferred from their email address (${email}) — confirm with the customer.`
+  const nameNote =
+    !extractedName && closedLead?.name
+      ? ` Name and company carried over from a previous (closed) lead — confirm still current.`
+      : guessedName
+        ? ` Name inferred from their email address (${email}) — confirm with the customer.`
+        : "";
+  const closedLeadNote = closedLead
+    ? ` This customer has a previous lead that closed as ${STAGE_LABELS[closedLead.stage]} — linked as history.`
     : "";
-  const note = `Auto-created from simulated email intake (AI triage).\n\n${data.summary}${nameNote}`.slice(
+  const note = `Auto-created from simulated email intake (AI triage).\n\n${data.summary}${nameNote}${closedLeadNote}`.slice(
     0,
     MAX_LENGTHS.note,
   );
@@ -136,6 +153,7 @@ export async function processSimulatedEmail(
       phone: phone || null,
       company: company || null,
       source: "EMAIL",
+      previousLeadId: closedLead?.id ?? null,
       suggestedLineItems: newSuggestedLineItems.length > 0 ? JSON.stringify(newSuggestedLineItems) : null,
       activities: { create: [{ type: "NOTE", note }] },
       messages: { create: messagesData },

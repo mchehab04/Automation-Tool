@@ -15,7 +15,27 @@ model Business {
   name      String
   createdAt DateTime @default(now())
 
-  leads Lead[]
+  leads        Lead[]
+  catalogItems ServiceCatalogItem[]
+}
+
+// Priced parts/labor entries a business offers (e.g. "Oil change" — $65),
+// given to the AI email-intake extraction step as grounding context so
+// suggested_line_items reuse real catalogue prices/wording instead of
+// inventing them. A human still reviews every suggestion before a quote is
+// sent, so imperfect AI matching against this list is an acceptable
+// trade-off — no separate deterministic fuzzy-matching layer.
+model ServiceCatalogItem {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id])
+  description String
+  // Stored in cents, matching Quote.totalAmount's convention, to avoid
+  // float rounding issues.
+  unitPrice   Int
+  createdAt   DateTime @default(now())
+
+  @@index([businessId])
 }
 
 enum PipelineStage {
@@ -54,6 +74,13 @@ model Lead {
   pendingReplyText   String?
   // Booked appointment time, set when the lead moves to SCHEDULED.
   scheduledAt        DateTime?
+  // Set when this lead was created because the same contact (by email/phone)
+  // had a prior lead that had already closed WON/LOST — links a repeat
+  // customer's new engagement back to their history without reopening the
+  // closed lead itself. Never set on a continued (still-open) lead.
+  previousLeadId     String?
+  previousLead       Lead?         @relation("LeadFollowUp", fields: [previousLeadId], references: [id], onDelete: SetNull)
+  followUpLeads      Lead[]        @relation("LeadFollowUp")
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -64,6 +91,7 @@ model Lead {
 
   @@index([businessId])
   @@index([stage])
+  @@index([previousLeadId])
 }
 
 enum ActivityType {

@@ -50,7 +50,8 @@ const EXTRACT_TOOL = {
         type: "array" as const,
         description:
           "A rough starting point for a quote, based only on what the customer described (e.g. a diagnostic inspection for a described symptom). Empty array if there isn't enough to go on, or if is_enquiry is false. These are drafts a human reviews before any quote is sent — do not try to be precise about pricing. " +
-          "If the message thread includes an \"Already drafted for this quote\" section, that reflects everything suggested so far — return the FULL corrected list, not just what's new: fold in what the latest message adds, replace or correct any item the latest message clarifies (e.g. a vague \"wheel change\" followed up with \"replace 2 rear tires\" is the SAME job, not two separate line items), and keep anything still relevant. Don't just append.",
+          "If the message thread includes an \"Already drafted for this quote\" section, that reflects everything suggested so far — return the FULL corrected list, not just what's new: fold in what the latest message adds, replace or correct any item the latest message clarifies (e.g. a vague \"wheel change\" followed up with \"replace 2 rear tires\" is the SAME job, not two separate line items), and keep anything still relevant. Don't just append. " +
+                "If the message thread includes this business's service price catalogue, prefer reusing an entry's exact description and price whenever the customer's request matches it. Adapt only the quantity; don't rewrite the wording or guess a different price for a catalogued item. Only invent a description/price for something genuinely not in the catalogue.",
         items: {
           type: "object" as const,
           properties: {
@@ -104,15 +105,23 @@ const SYSTEM_PROMPTS = {
     "Extract the customer's name and what they need. The sender's email address is already " +
     "known from the message headers, so don't worry about whether contact info is present — " +
     "focus on summarizing the request and, if anything about it is unclear, drafting a short, " +
-    "friendly clarifying question.",
+    "friendly clarifying question. If the message includes this business's service price " +
+    "catalogue, ground your suggested line items in it wherever the customer's request " +
+    "matches an entry.",
 } as const;
 
 export type ExistingSuggestion = { description: string; quantity: string; unitPrice: string };
+
+// Whole-dollar-string, matching ExistingSuggestion's convention — catalogue
+// prices are stored in cents (ServiceCatalogItem.unitPrice) and converted at
+// this boundary, not carried through the app in dollars anywhere else.
+export type CatalogItem = { description: string; unitPrice: string };
 
 export async function extractEnquiry(
   threadText: string,
   mode: keyof typeof SYSTEM_PROMPTS,
   existingSuggestions?: ExistingSuggestion[],
+  catalogItems?: CatalogItem[],
 ): Promise<ExtractedEnquiry> {
   const existingSuggestionsBlock =
     existingSuggestions && existingSuggestions.length > 0
@@ -121,12 +130,22 @@ export async function extractEnquiry(
           .join("\n")}`
       : "";
 
+  const catalogBlock =
+    catalogItems && catalogItems.length > 0
+      ? `\n\nThis business's service price catalogue (use these exact descriptions and prices when a customer's request matches one, rather than inventing your own wording/price — but if what they're asking about isn't in this list, describe and estimate it yourself as usual, since not every job is catalogued):\n${catalogItems
+          .map((item) => `- ${item.description} — $${item.unitPrice}`)
+          .join("\n")}`
+      : "";
+
   const response = await client.messages.create({
     model: MODEL,
     max_tokens: 1024,
     system: SYSTEM_PROMPTS[mode],
     messages: [
-      { role: "user", content: `Message thread:\n\n${threadText}${existingSuggestionsBlock}` },
+      {
+        role: "user",
+        content: `Message thread:\n\n${threadText}${existingSuggestionsBlock}${catalogBlock}`,
+      },
     ],
     tools: [EXTRACT_TOOL],
     tool_choice: { type: "tool", name: "record_enquiry" },

@@ -32,6 +32,8 @@ export default async function LeadDetailPage({
       activities: { orderBy: { createdAt: "desc" } },
       quotes: { orderBy: { generatedAt: "desc" } },
       messages: { orderBy: { createdAt: "asc" } },
+      previousLead: { select: { id: true, name: true, stage: true } },
+      followUpLeads: { select: { id: true, name: true, stage: true }, orderBy: { createdAt: "desc" } },
     },
   });
 
@@ -59,6 +61,35 @@ export default async function LeadDetailPage({
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">{lead.name}</h1>
             {lead.company ? <p className="text-sm text-muted-foreground">{lead.company}</p> : null}
+            {lead.previousLead ? (
+              <p className="text-sm text-muted-foreground">
+                Follow-up to a previous lead —{" "}
+                <Link
+                  href={`/leads/${lead.previousLead.id}`}
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  {lead.previousLead.name}
+                </Link>{" "}
+                ({STAGE_LABELS[lead.previousLead.stage]})
+              </p>
+            ) : null}
+            {lead.followUpLeads.length > 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {lead.followUpLeads.length === 1 ? "1 follow-up lead" : `${lead.followUpLeads.length} follow-up leads`}
+                {" — "}
+                {lead.followUpLeads.map((followUp, i) => (
+                  <span key={followUp.id}>
+                    {i > 0 ? ", " : ""}
+                    <Link
+                      href={`/leads/${followUp.id}`}
+                      className="underline underline-offset-2 hover:text-foreground"
+                    >
+                      {followUp.name}
+                    </Link>
+                  </span>
+                ))}
+              </p>
+            ) : null}
           </div>
           <div className="flex items-center gap-2">
             {lead.source !== "MANUAL" ? (

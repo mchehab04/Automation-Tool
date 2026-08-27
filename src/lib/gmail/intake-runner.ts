@@ -9,12 +9,14 @@ import {
   guessNameFromEmail,
   isPlaceholderText,
 } from "@/lib/validation";
-import { extractEnquiry } from "@/lib/intake/extract-enquiry";
+import { extractEnquiry, type CatalogItem } from "@/lib/intake/extract-enquiry";
 import {
   findExistingLeadByContact,
+  findMostRecentClosedLead,
   buildSuggestedLineItems,
   type SuggestedLineItem,
 } from "@/lib/intake/lead-matching";
+import { STAGE_LABELS } from "@/lib/pipeline";
 import { withImapConnection, type ImapUnavailable } from "@/lib/gmail/imap-client";
 import { parseRawMessage } from "@/lib/gmail/parse-message";
 
@@ -77,10 +79,19 @@ async function processOneMessage(
   // Known from the header before any AI call, unlike phone (which only ever
   // comes from the message body) — so the lookup can happen up front and its
   // history/existing suggestions can be given to the model as context.
-  const existingLead = await findExistingLeadByContact(DEMO_BUSINESS_ID, { email });
+  const [existingLead, catalogItemsRaw] = await Promise.all([
+    findExistingLeadByContact(DEMO_BUSINESS_ID, { email }),
+    prisma.serviceCatalogItem.findMany({ where: { businessId: DEMO_BUSINESS_ID } }),
+  ]);
   const priorSuggestions: SuggestedLineItem[] = existingLead?.suggestedLineItems
     ? JSON.parse(existingLead.suggestedLineItems)
     : [];
+  // Cents on disk, whole-dollar string at the extractEnquiry prompt boundary
+  // — see CatalogItem's doc comment in extract-enquiry.ts.
+  const catalogItems: CatalogItem[] = catalogItemsRaw.map((item) => ({
+    description: item.description,
+    unitPrice: String(Math.round(item.unitPrice / 100)),
+  }));
 
   // Full prior conversation, not just the latest message — otherwise a reply
   // like "yes that works for me" has nothing for the model to resolve
@@ -101,7 +112,7 @@ async function processOneMessage(
   const threadText = priorThreadText
     ? `${priorThreadText}\n\nCustomer: ${parsed.text}`
     : `Subject: ${parsed.subject}\n\nCustomer: ${parsed.text}`;
-  const data = await extractEnquiry(threadText, "real", priorSuggestions);
+  const data = await extractEnquiry(threadText, "real", priorSuggestions, catalogItems);
 
   if (!data.is_enquiry) {
     summary.skippedNotEnquiry++;
@@ -109,10 +120,20 @@ async function processOneMessage(
     return;
   }
 
+  // Only relevant when there's no open lead to continue — a returning
+  // customer whose prior engagement already closed gets a fresh lead
+  // (see findExistingLeadByContact), linked back to this one for history.
+  const closedLead = existingLead
+    ? null
+    : await findMostRecentClosedLead(DEMO_BUSINESS_ID, { email });
+
   const phoneRaw = data.phone.trim();
   const phone = phoneRaw && isValidPhone(phoneRaw) ? normalizePhone(phoneRaw) : "";
   const companyRaw = data.company.trim();
-  const company = !isPlaceholderText(companyRaw) ? companyRaw.slice(0, MAX_LENGTHS.company) : "";
+  const company =
+    companyRaw && !isPlaceholderText(companyRaw)
+      ? companyRaw.slice(0, MAX_LENGTHS.company)
+      : closedLead?.company || "";
 
   // Real headers give a stronger fallback chain than the simulator ever has —
   // an AI-missed name still has the account's own display name to fall back
@@ -128,6 +149,9 @@ async function processOneMessage(
     name = extractedName;
   } else if (existingLead?.name) {
     name = existingLead.name;
+  } else if (closedLead?.name) {
+    name = closedLead.name;
+    nameNote = ` Name and company carried over from a previous (closed) lead — confirm still current.`;
   } else if (headerName) {
     name = headerName;
     nameNote = ` Name taken from the email's display name (${email}) — confirm with the customer.`;
@@ -193,7 +217,10 @@ async function processOneMessage(
 
       summary.leadsContinued++;
     } else {
-      const note = `Auto-created from Gmail intake (AI triage).\n\n${data.summary}${nameNote}${clarifyingNote}`.slice(
+      const closedLeadNote = closedLead
+        ? ` This customer has a previous lead that closed as ${STAGE_LABELS[closedLead.stage]} — linked as history.`
+        : "";
+      const note = `Auto-created from Gmail intake (AI triage).\n\n${data.summary}${nameNote}${clarifyingNote}${closedLeadNote}`.slice(
         0,
         MAX_LENGTHS.note,
       );
@@ -206,6 +233,7 @@ async function processOneMessage(
           phone: phone || null,
           company: company || null,
           source: "EMAIL",
+          previousLeadId: closedLead?.id ?? null,
           suggestedLineItems:
             updatedSuggestedLineItems.length > 0 ? JSON.stringify(updatedSuggestedLineItems) : null,
           pendingReplyText: draftReply || null,
