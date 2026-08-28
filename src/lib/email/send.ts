@@ -1,4 +1,6 @@
 import nodemailer from "nodemailer";
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db";
 
 export type SendEmailInput = {
   to: string;
@@ -60,4 +62,50 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+// Shared by every "send an email tied to a lead" flow (reply, quote,
+// closing thank-you) — each of those hand-duplicated the exact same
+// send-and-branch-on-outcome logic before this was factored out. Only the
+// failure path is fully absorbed here (identical across every caller: one
+// Activity note, revalidate, throw); the success-path note is returned so
+// each caller can still write it inside its own transaction alongside its
+// own field-clearing/notification-marking, preserving each flow's existing
+// atomicity exactly.
+export async function sendLeadEmail(
+  leadId: string,
+  input: {
+    to: string;
+    fromName: string;
+    subject: string;
+    text: string;
+    attachment?: SendEmailInput["attachment"];
+    label: string;
+  },
+): Promise<{ delivered: boolean; simulated: boolean; note: string }> {
+  const result = await sendEmail({
+    to: input.to,
+    fromName: input.fromName,
+    subject: input.subject,
+    text: input.text,
+    attachment: input.attachment,
+  });
+
+  if (!result.delivered && !result.simulated) {
+    await prisma.activity.create({
+      data: {
+        leadId,
+        type: "NOTE",
+        note: `${input.label} failed to send to ${input.to}: ${result.error ?? "unknown error"}.`,
+      },
+    });
+    revalidatePath(`/leads/${leadId}`);
+    throw new Error(result.error ?? `Failed to send the ${input.label.toLowerCase()}.`);
+  }
+
+  const note = result.delivered
+    ? `${input.label} emailed to ${input.to}.`
+    : `${input.label} approved to send to ${input.to} — no email provider is configured yet, so this wasn't actually delivered.`;
+
+  return { delivered: result.delivered, simulated: result.simulated, note };
 }

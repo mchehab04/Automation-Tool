@@ -165,6 +165,7 @@ async function processOneMessage(
 
   const draftReply = data.draft_reply.trim();
   const clarifyingNote = draftReply ? ` A clarifying question worth asking: "${draftReply}"` : "";
+  const acknowledgmentMessage = data.acknowledgment_message.trim();
 
   // The model was given whatever was already drafted and asked to return the
   // full corrected picture, not just an addition — so this replaces rather
@@ -192,6 +193,7 @@ async function processOneMessage(
               updatedSuggestedLineItems.length > 0 ? JSON.stringify(updatedSuggestedLineItems) : undefined,
             // Replaced, not merged — a reply is one current draft, not a list.
             pendingReplyText: draftReply || undefined,
+            pendingQuoteMessage: acknowledgmentMessage || undefined,
           },
         }),
         prisma.activity.create({ data: { leadId: existingLead.id, type: "NOTE", note } }),
@@ -237,6 +239,7 @@ async function processOneMessage(
           suggestedLineItems:
             updatedSuggestedLineItems.length > 0 ? JSON.stringify(updatedSuggestedLineItems) : null,
           pendingReplyText: draftReply || null,
+          pendingQuoteMessage: acknowledgmentMessage || null,
           activities: { create: [{ type: "NOTE", note }] },
           messages: { create: messageData },
         },

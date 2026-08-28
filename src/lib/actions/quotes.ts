@@ -7,7 +7,7 @@ import { MAX_LENGTHS, parseForgivingNumber } from "@/lib/validation";
 import type { QuoteLineItem } from "@/lib/pdf/quote-document";
 import { formatQuoteNumber } from "@/lib/quote-number";
 import { renderQuotePdf } from "@/lib/pdf/render-quote";
-import { sendEmail } from "@/lib/email/send";
+import { sendLeadEmail } from "@/lib/email/send";
 
 export async function createQuote(leadId: string, formData: FormData) {
   const descriptions = formData.getAll("description").map(String);
@@ -77,7 +77,12 @@ export async function createQuote(leadId: string, formData: FormData) {
   redirect(`/leads/${leadId}?quote=${quote.id}`);
 }
 
-export async function sendQuoteToCustomer(quoteId: string) {
+export async function sendQuoteToCustomer(quoteId: string, message: string) {
+  const trimmed = message.trim();
+  if (!trimmed) {
+    throw new Error("Message can't be empty.");
+  }
+
   const quote = await prisma.quote.findUniqueOrThrow({
     where: { id: quoteId },
     include: { lead: { include: { business: true } } },
@@ -90,31 +95,14 @@ export async function sendQuoteToCustomer(quoteId: string) {
   const number = formatQuoteNumber(quote.number ?? 0);
   const { buffer, filename } = await renderQuotePdf(quoteId);
 
-  const result = await sendEmail({
+  const { note } = await sendLeadEmail(quote.leadId, {
     to: quote.lead.email,
     fromName: quote.lead.business.name,
     subject: `Your quote from ${quote.lead.business.name} — #${number}`,
-    text: `Hi ${quote.lead.name}, please find your quote #${number} attached.`,
+    text: trimmed,
     attachment: { filename, content: buffer, contentType: "application/pdf" },
+    label: `Quote #${number}`,
   });
-
-  // A real send failure (bad credentials, network, etc.) shouldn't be
-  // recorded as sent — surface it so the employee knows to retry.
-  if (!result.delivered && !result.simulated) {
-    await prisma.activity.create({
-      data: {
-        leadId: quote.leadId,
-        type: "NOTE",
-        note: `Quote #${number} failed to send to ${quote.lead.email}: ${result.error ?? "unknown error"}.`,
-      },
-    });
-    revalidatePath(`/leads/${quote.leadId}`);
-    throw new Error(result.error ?? "Failed to send the quote email.");
-  }
-
-  const note = result.delivered
-    ? `Quote #${number} emailed to ${quote.lead.email}.`
-    : `Quote #${number} approved to send to ${quote.lead.email} — no email provider is configured yet, so this wasn't actually delivered.`;
 
   // A sent quote is the real-world event the "Quote Sent" stage represents —
   // fast-forward it automatically rather than making staff remember to also
@@ -126,9 +114,15 @@ export async function sendQuoteToCustomer(quoteId: string) {
   await prisma.$transaction([
     prisma.quote.update({ where: { id: quote.id }, data: { sentAt: new Date() } }),
     prisma.activity.create({ data: { leadId: quote.leadId, type: "NOTE", note } }),
+    prisma.lead.update({
+      where: { id: quote.leadId },
+      data: {
+        pendingQuoteMessage: null,
+        ...(shouldAdvanceStage ? { stage: "QUOTE_SENT" as const } : {}),
+      },
+    }),
     ...(shouldAdvanceStage
       ? [
-          prisma.lead.update({ where: { id: quote.leadId }, data: { stage: "QUOTE_SENT" as const } }),
           prisma.activity.create({
             data: {
               leadId: quote.leadId,

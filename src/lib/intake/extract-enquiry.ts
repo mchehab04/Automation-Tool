@@ -18,6 +18,7 @@ export type ExtractedEnquiry = {
   company: string;
   summary: string;
   draft_reply: string;
+  acknowledgment_message: string;
   suggested_line_items: ExtractedSuggestedLineItem[];
 };
 
@@ -45,6 +46,11 @@ const EXTRACT_TOOL = {
         type: "string" as const,
         description:
           "A short, friendly reply asking for whatever contact info is missing. Empty string if name and at least one of email/phone are already present.",
+      },
+      acknowledgment_message: {
+        type: "string" as const,
+        description:
+          "Written as the ENTIRE email body that will accompany the quote once one is prepared — references what the customer asked about, mentions a quote is attached, warm and short (2-4 sentences). No separate greeting/sign-off is appended afterward, so include it here. Populate this ONLY when draft_reply is empty (nothing is missing or unclear) — the two are mutually exclusive. Empty string if draft_reply is non-empty, or if is_enquiry is false.",
       },
       suggested_line_items: {
         type: "array" as const,
@@ -82,6 +88,7 @@ const EXTRACT_TOOL = {
       "company",
       "summary",
       "draft_reply",
+      "acknowledgment_message",
       "suggested_line_items",
     ],
   },
@@ -96,7 +103,8 @@ const SYSTEM_PROMPTS = {
     "Extract the customer's contact details and what they need. A lead can only be logged " +
     "once you have a name and at least one way to reach them (email or phone) — if the " +
     "thread doesn't have those yet, draft a short, friendly reply asking for whatever is " +
-    "missing.",
+    "missing. Once you have everything needed to log the lead, instead draft a short " +
+    "acknowledgment_message that will accompany the quote (skip draft_reply in that case).",
   // Real intake always has a reliable sender address from the email headers,
   // so the model doesn't need to gate on contact info — just extract what it
   // can and describe what the customer needs.
@@ -105,7 +113,9 @@ const SYSTEM_PROMPTS = {
     "Extract the customer's name and what they need. The sender's email address is already " +
     "known from the message headers, so don't worry about whether contact info is present — " +
     "focus on summarizing the request and, if anything about it is unclear, drafting a short, " +
-    "friendly clarifying question. If the message includes this business's service price " +
+    "friendly clarifying question. When nothing about the request is unclear, instead draft a " +
+    "short acknowledgment_message that will accompany the quote email (skip draft_reply in " +
+    "that case). If the message includes this business's service price " +
     "catalogue, ground your suggested line items in it wherever the customer's request " +
     "matches an entry.",
 } as const;

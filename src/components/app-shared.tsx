@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { LayoutDashboardIcon, Users2Icon, BarChart3Icon } from "lucide-react";
+import { LayoutDashboardIcon, Users2Icon, BarChart3Icon, CalendarIcon } from "lucide-react";
 
 export type SidebarNavItem = {
 	title: string;
@@ -26,6 +26,11 @@ export const navGroups: SidebarNavGroup[] = [
 				title: "Leads",
 				path: "/leads",
 				icon: <Users2Icon />,
+			},
+			{
+				title: "Calendar",
+				path: "/calendar",
+				icon: <CalendarIcon />,
 			},
 			{
 				title: "Analytics",

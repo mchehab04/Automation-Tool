@@ -19,6 +19,7 @@ import {
   mergeSuggestedLineItems,
 } from "@/lib/intake/lead-matching";
 import { STAGE_LABELS } from "@/lib/pipeline";
+import { defaultQuoteMessage } from "@/lib/quote-message";
 
 const DEMO_BUSINESS_ID = "demo-business";
 
@@ -88,6 +89,13 @@ export async function processSimulatedEmail(
 
   const newSuggestedLineItems = buildSuggestedLineItems(data.suggested_line_items);
 
+  // The deterministic gate above already confirmed nothing is missing. The
+  // model might not have populated acknowledgment_message if its own
+  // internal judgment differed from that gate — fall back to a generated
+  // message rather than leaving this blank (unlike the real-intake path,
+  // which trusts the model's own judgment and has no such fallback).
+  const acknowledgmentMessage = data.acknowledgment_message.trim() || defaultQuoteMessage(name);
+
   if (existingLead) {
     const note = `New message received via email intake (AI triage).\n\n${data.summary}`.slice(
       0,
@@ -105,6 +113,7 @@ export async function processSimulatedEmail(
         data: {
           messages: { create: messagesData },
           suggestedLineItems: mergedSuggestions.length > 0 ? JSON.stringify(mergedSuggestions) : undefined,
+          pendingQuoteMessage: acknowledgmentMessage,
         },
       }),
       prisma.activity.create({ data: { leadId: existingLead.id, type: "NOTE", note } }),
@@ -155,6 +164,7 @@ export async function processSimulatedEmail(
       source: "EMAIL",
       previousLeadId: closedLead?.id ?? null,
       suggestedLineItems: newSuggestedLineItems.length > 0 ? JSON.stringify(newSuggestedLineItems) : null,
+      pendingQuoteMessage: acknowledgmentMessage,
       activities: { create: [{ type: "NOTE", note }] },
       messages: { create: messagesData },
     },

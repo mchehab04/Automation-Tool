@@ -88,6 +88,13 @@ model Lead {
   // only) — cleared once accepted/sent via sendPendingReply. Replaced, not
   // merged, on a new message: a reply is one current draft, not a list.
   pendingReplyText   String?
+  // AI-drafted message to accompany a quote, populated at intake time
+  // whenever nothing was missing/unclear (the complement of
+  // pendingReplyText) — cleared once a quote is actually sent.
+  pendingQuoteMessage String?
+  // AI-drafted thank-you message awaiting staff review, populated when a
+  // lead closes WON/LOST — cleared once sent via sendClosingMessage.
+  pendingClosingMessage String?
   // Booked appointment time, set when the lead moves to SCHEDULED.
   scheduledAt        DateTime?
   // Set when this lead was created because the same contact (by email/phone)
@@ -182,6 +189,8 @@ enum NotificationType {
   QUOTE_SEND_PENDING
   // Real Gmail intake drafted a clarifying reply awaiting staff review.
   REPLY_SEND_PENDING
+  // A thank-you message drafted for a just-closed lead is awaiting review.
+  THANK_YOU_SEND_PENDING
 }
 
 // In-app "needs your attention" queue, shown via the header bell icon —

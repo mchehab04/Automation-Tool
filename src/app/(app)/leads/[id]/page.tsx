@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StageSelect } from "@/components/leads/stage-select";
 import { QuoteForm, type SuggestedLineItem } from "@/components/leads/quote-form";
-import { SendQuoteButton } from "@/components/leads/send-quote-button";
+import { SendQuoteCard } from "@/components/leads/send-quote-card";
 import { PendingReplyCard } from "@/components/leads/pending-reply-card";
+import { ClosingMessageCard } from "@/components/leads/closing-message-card";
 import { formatQuoteNumber } from "@/lib/quote-number";
 import { NoteForm } from "@/components/leads/note-form";
 import { prisma } from "@/lib/db";
@@ -19,6 +20,7 @@ import {
   stageBadgeClassName,
 } from "@/lib/pipeline";
 import { BUSINESS_TIMEZONE } from "@/lib/timezone";
+import { defaultQuoteMessage } from "@/lib/quote-message";
 
 export default async function LeadDetailPage({
   params,
@@ -182,7 +184,10 @@ export default async function LeadDetailPage({
                           Sent to customer {quote.sentAt.toLocaleString("en-US")}
                         </p>
                       ) : (
-                        <SendQuoteButton quoteId={quote.id} />
+                        <SendQuoteCard
+                          quoteId={quote.id}
+                          initialMessage={lead.pendingQuoteMessage || defaultQuoteMessage(lead.name)}
+                        />
                       )}
                     </li>
                   ))}
@@ -224,6 +229,10 @@ export default async function LeadDetailPage({
         <div className="flex flex-col gap-6">
           {lead.pendingReplyText ? (
             <PendingReplyCard leadId={lead.id} draft={lead.pendingReplyText} />
+          ) : null}
+
+          {lead.pendingClosingMessage ? (
+            <ClosingMessageCard leadId={lead.id} draft={lead.pendingClosingMessage} />
           ) : null}
 
           {reportActivity ? (
