@@ -4,6 +4,11 @@ import { KanbanBoard } from "@/components/leads/kanban-board";
 import { GmailCheckButton } from "@/components/leads/gmail-check-button";
 import { prisma } from "@/lib/db";
 
+// Live business data — always render per-request, never pre-render at build
+// time (which would both freeze a stale snapshot and require the build
+// machine to reach the database, which it may not be able to).
+export const dynamic = "force-dynamic";
+
 const DEMO_BUSINESS_ID = "demo-business";
 
 export default async function LeadsPage() {

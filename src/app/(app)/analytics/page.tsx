@@ -4,6 +4,11 @@ import { prisma } from "@/lib/db";
 import { PIPELINE_STAGES, REASON_CODES } from "@/lib/pipeline";
 import type { PipelineStage } from "@/generated/prisma/enums";
 
+// Live business data — always render per-request, never pre-render at build
+// time (which would both freeze a stale snapshot and require the build
+// machine to reach the database, which it may not be able to).
+export const dynamic = "force-dynamic";
+
 const DEMO_BUSINESS_ID = "demo-business";
 
 async function getStageCounts(): Promise<Record<PipelineStage, number>> {
