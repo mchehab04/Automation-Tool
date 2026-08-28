@@ -13,6 +13,7 @@ import {
   normalizePhone,
 } from "@/lib/validation";
 import type { PipelineStage } from "@/generated/prisma/enums";
+import { BUSINESS_TIMEZONE, parseUaeDateTimeLocal } from "@/lib/timezone";
 
 const DEMO_BUSINESS_ID = "demo-business";
 
@@ -79,7 +80,9 @@ export async function updateLeadStage(
   // later means that appointment was completed and the car was returned.
   let scheduledDate: Date | null = null;
   if (nextStage === "SCHEDULED") {
-    scheduledDate = scheduledAt ? new Date(scheduledAt) : null;
+    // The dropdown's value is UAE wall-clock digits (see getAvailableSlots),
+    // not the server's local time — parse it as such, not via `new Date()`.
+    scheduledDate = scheduledAt ? parseUaeDateTimeLocal(scheduledAt) : null;
     if (!scheduledDate || Number.isNaN(scheduledDate.getTime())) {
       throw new Error("Pick a date and time for the appointment.");
     }
@@ -98,7 +101,7 @@ export async function updateLeadStage(
         toStage: nextStage,
         reasonCode: requiredCodes ? reasonCode : null,
         note: scheduledDate
-          ? `Service scheduled for ${scheduledDate.toLocaleString("en-US")}.`
+          ? `Service scheduled for ${scheduledDate.toLocaleString("en-US", { timeZone: BUSINESS_TIMEZONE })}.`
           : null,
       },
     }),

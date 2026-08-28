@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { SLOT_MINUTES, BUSINESS_HOURS, OPEN_WEEKDAYS, BOOKING_WINDOW_DAYS } from "@/lib/scheduling";
+import { BUSINESS_TIMEZONE, toUaeParts, fromUaeParts } from "@/lib/timezone";
 
 export type AvailableDay = {
   date: string; // "YYYY-MM-DD", for grouping
@@ -13,21 +14,26 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-// Matches the format <input type="datetime-local"> produces — updateLeadStage
-// already parses this shape via `new Date(scheduledAt)`.
+// Matches the format <input type="datetime-local"> produces. Renders the
+// UAE wall-clock digits of this instant (not the server's local digits) —
+// updateLeadStage parses this shape back via parseUaeDateTimeLocal, which
+// assumes the same convention.
 function toDateTimeLocalString(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const p = toUaeParts(d);
+  return `${p.year}-${pad(p.month + 1)}-${pad(p.day)}T${pad(p.hours)}:${pad(p.minutes)}`;
 }
 
 export async function getAvailableSlots(): Promise<AvailableDay[]> {
   const now = new Date();
-  const windowStart = new Date(now);
-  windowStart.setHours(0, 0, 0, 0);
-  const windowEnd = new Date(windowStart);
-  windowEnd.setDate(windowEnd.getDate() + BOOKING_WINDOW_DAYS);
+  const nowUae = toUaeParts(now);
+  const windowStart = fromUaeParts(nowUae.year, nowUae.month, nowUae.day);
+  const windowEnd = fromUaeParts(nowUae.year, nowUae.month, nowUae.day + BOOKING_WINDOW_DAYS);
 
   const booked = await prisma.lead.findMany({
-    where: { scheduledAt: { gte: windowStart, lt: windowEnd } },
+    // A Lost lead's booking no longer holds its slot — the appointment
+    // isn't happening, so it should become available again. A Won lead's
+    // slot correctly stays blocked (the service actually happened).
+    where: { scheduledAt: { gte: windowStart, lt: windowEnd }, stage: { not: "LOST" } },
     select: { scheduledAt: true },
   });
   const bookedTimes = booked.map((b) => b.scheduledAt!);
@@ -41,32 +47,40 @@ export async function getAvailableSlots(): Promise<AvailableDay[]> {
   const days: AvailableDay[] = [];
 
   for (let dayOffset = 0; dayOffset < BOOKING_WINDOW_DAYS; dayOffset++) {
-    const day = new Date(windowStart);
-    day.setDate(day.getDate() + dayOffset);
-    if (!OPEN_WEEKDAYS.includes(day.getDay())) continue;
+    const dayStart = fromUaeParts(nowUae.year, nowUae.month, nowUae.day + dayOffset);
+    if (!OPEN_WEEKDAYS.includes(toUaeParts(dayStart).weekday)) continue;
 
-    const dayEnd = new Date(day);
-    dayEnd.setHours(BUSINESS_HOURS.endHour, 0, 0, 0);
+    const dayEnd = fromUaeParts(nowUae.year, nowUae.month, nowUae.day + dayOffset, BUSINESS_HOURS.endHour, 0);
 
     const slots: { value: string; label: string }[] = [];
-    const t = new Date(day);
-    t.setHours(BUSINESS_HOURS.startHour, 0, 0, 0);
+    let t = fromUaeParts(nowUae.year, nowUae.month, nowUae.day + dayOffset, BUSINESS_HOURS.startHour, 0);
 
     while (t < dayEnd) {
       const slotEnd = new Date(t.getTime() + SLOT_MINUTES * 60 * 1000);
       if (t > now && !isTaken(t, slotEnd)) {
         slots.push({
           value: toDateTimeLocalString(t),
-          label: t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+          label: t.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            timeZone: BUSINESS_TIMEZONE,
+          }),
         });
       }
-      t.setMinutes(t.getMinutes() + SLOT_MINUTES);
+      // Pure elapsed-time arithmetic — immune to any timezone/DST
+      // reinterpretation, unlike mutating via setMinutes/getMinutes.
+      t = new Date(t.getTime() + SLOT_MINUTES * 60 * 1000);
     }
 
     if (slots.length > 0) {
       days.push({
-        date: toDateTimeLocalString(day).slice(0, 10),
-        label: day.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+        date: toDateTimeLocalString(dayStart).slice(0, 10),
+        label: dayStart.toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          timeZone: BUSINESS_TIMEZONE,
+        }),
         slots,
       });
     }

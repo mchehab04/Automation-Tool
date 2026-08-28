@@ -10,10 +10,21 @@ datasource db {
   provider = "postgresql"
 }
 
+// What kind of business this is — lets the same pipeline app support more
+// than the auto-garage vertical later (house maintenance, real estate, ...)
+// without a schema change. Not branched on anywhere in the code yet; this
+// is prep, not a behavior change.
+enum BusinessCategory {
+  AUTO_GARAGE
+  HOUSE_MAINTENANCE
+  REAL_ESTATE
+}
+
 model Business {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   name      String
-  createdAt DateTime @default(now())
+  category  BusinessCategory @default(AUTO_GARAGE)
+  createdAt DateTime         @default(now())
 
   leads        Lead[]
   catalogItems ServiceCatalogItem[]
@@ -26,14 +37,19 @@ model Business {
 // sent, so imperfect AI matching against this list is an acceptable
 // trade-off — no separate deterministic fuzzy-matching layer.
 model ServiceCatalogItem {
-  id          String   @id @default(cuid())
+  id          String           @id @default(cuid())
   businessId  String
-  business    Business @relation(fields: [businessId], references: [id])
+  business    Business         @relation(fields: [businessId], references: [id])
   description String
   // Stored in cents, matching Quote.totalAmount's convention, to avoid
   // float rounding issues.
   unitPrice   Int
-  createdAt   DateTime @default(now())
+  // Which business vertical this item applies to — currently always matches
+  // its own business's category (a catalogue item belongs to exactly one
+  // business), but tagging it explicitly here sets up future shared/
+  // template catalogues without another migration.
+  category    BusinessCategory @default(AUTO_GARAGE)
+  createdAt   DateTime         @default(now())
 
   @@index([businessId])
 }

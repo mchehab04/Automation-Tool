@@ -3,6 +3,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
 import { STAGE_LABELS, getReasonLabel } from "@/lib/pipeline";
+import { BUSINESS_TIMEZONE } from "@/lib/timezone";
 
 const MODEL = "claude-sonnet-5";
 const MAX_REPORT_LENGTH = 2000;
@@ -62,7 +63,7 @@ export async function generateClosingReport(
           `Lead: ${lead.name}${lead.company ? ` (${lead.company})` : ""}\n` +
           `Outcome: ${STAGE_LABELS[finalStage]}${reasonLabel ? ` — ${reasonLabel}` : ""}\n` +
           (lead.scheduledAt
-            ? `Appointment was scheduled for: ${lead.scheduledAt.toLocaleString("en-US")}\n\n`
+            ? `Appointment was scheduled for: ${lead.scheduledAt.toLocaleString("en-US", { timeZone: BUSINESS_TIMEZONE })}\n\n`
             : "\n") +
           `Conversation transcript:\n${transcript || "(none recorded)"}\n\n` +
           `Notes:\n${notes || "(none)"}\n\n` +

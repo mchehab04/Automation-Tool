@@ -42,7 +42,7 @@ async function main() {
   const business = await prisma.business.upsert({
     where: { id: "demo-business" },
     update: {},
-    create: { id: "demo-business", name: "Demo Business" },
+    create: { id: "demo-business", name: "Demo Business", category: "AUTO_GARAGE" },
   });
 
   // Delete-then-recreate keeps this safely re-runnable without needing a
@@ -53,6 +53,7 @@ async function main() {
       businessId: business.id,
       description: item.description,
       unitPrice: Math.round(item.unitPriceDollars * 100),
+      category: "AUTO_GARAGE",
     })),
   });
 

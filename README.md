@@ -11,7 +11,20 @@ A pipeline automation platform for SMEs — unifies lead intake, pipeline tracki
 
 ## Stack
 
-Next.js (App Router) · TypeScript · Prisma (SQLite via libsql) · Tailwind CSS v4 · shadcn/ui (base-ui) · Recharts
+Next.js (App Router) · TypeScript · Prisma (PostgreSQL) · Tailwind CSS v4 · shadcn/ui (base-ui) · Recharts
+
+## Environment variables
+
+Copy `.env.example` to `.env` and fill in the values:
+
+```bash
+cp .env.example .env
+```
+
+All five are required for the app to run — `DATABASE_URL`, `ANTHROPIC_API_KEY`,
+`GMAIL_USER`, `GMAIL_APP_PASSWORD`, `CRON_SECRET`. (A couple of other keys may show up in a
+local `.env` for the separate lead-scraping skill/scripts under `active/` — those aren't
+read by the app itself and don't need to be set to run it.)
 
 ## Getting started
 

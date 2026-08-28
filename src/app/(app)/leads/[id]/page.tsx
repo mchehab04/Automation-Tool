@@ -18,6 +18,7 @@ import {
   stageBadgeVariant,
   stageBadgeClassName,
 } from "@/lib/pipeline";
+import { BUSINESS_TIMEZONE } from "@/lib/timezone";
 
 export default async function LeadDetailPage({
   params,
@@ -138,7 +139,7 @@ export default async function LeadDetailPage({
             <CardContent className="flex flex-col gap-3">
               {lead.scheduledAt ? (
                 <p className="text-sm text-muted-foreground">
-                  Appointment: {lead.scheduledAt.toLocaleString("en-US")}
+                  Appointment: {lead.scheduledAt.toLocaleString("en-US", { timeZone: BUSINESS_TIMEZONE })}
                 </p>
               ) : null}
               <StageSelect leadId={lead.id} stage={lead.stage} />
