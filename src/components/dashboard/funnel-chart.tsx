@@ -12,6 +12,7 @@ const STAGE_COLORS: Record<PipelineStage, string> = {
   QUALIFIED: "var(--chart-2)",
   QUOTE_SENT: "var(--chart-3)",
   SCHEDULED: "var(--chart-4)",
+  IN_PROGRESS: "var(--chart-5)",
   WON: "var(--status-good)",
   LOST: "var(--status-critical)",
 };

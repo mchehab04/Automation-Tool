@@ -12,6 +12,7 @@ import {
   normalizeEmail,
   normalizePhone,
 } from "@/lib/validation";
+import type { VehicleDetails } from "@/lib/vehicle";
 import type { PipelineStage } from "@/generated/prisma/enums";
 import { BUSINESS_TIMEZONE, parseUaeDateTimeLocal } from "@/lib/timezone";
 
@@ -61,6 +62,7 @@ export async function updateLeadStage(
   nextStage: PipelineStage,
   reasonCode?: string,
   scheduledAt?: string,
+  vehicle?: VehicleDetails,
 ) {
   const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId } });
 
@@ -88,10 +90,30 @@ export async function updateLeadStage(
     }
   }
 
+  // "Qualified" means the vehicle is identified, not just that contact info
+  // exists — required, not optional. Falls back to whatever's already on the
+  // lead (AI intake may have pre-filled it) so re-confirming an already-known
+  // vehicle isn't forced, but at least one of new-input/existing must cover
+  // all three fields.
+  let vehicleUpdate: { vehicleMake: string; vehicleModel: string; vehicleYear: string } | undefined;
+  if (nextStage === "QUALIFIED") {
+    const make = vehicle?.make.trim() || lead.vehicleMake || "";
+    const model = vehicle?.model.trim() || lead.vehicleModel || "";
+    const year = vehicle?.year.trim() || lead.vehicleYear || "";
+    if (!make || !model || !year) {
+      throw new Error("Vehicle make, model, and year are required to qualify this lead.");
+    }
+    vehicleUpdate = { vehicleMake: make, vehicleModel: model, vehicleYear: year };
+  }
+
   await prisma.$transaction([
     prisma.lead.update({
       where: { id: leadId },
-      data: { stage: nextStage, scheduledAt: scheduledDate ?? undefined },
+      data: {
+        stage: nextStage,
+        scheduledAt: scheduledDate ?? undefined,
+        ...vehicleUpdate,
+      },
     }),
     prisma.activity.create({
       data: {
@@ -102,7 +124,9 @@ export async function updateLeadStage(
         reasonCode: requiredCodes ? reasonCode : null,
         note: scheduledDate
           ? `Service scheduled for ${scheduledDate.toLocaleString("en-US", { timeZone: BUSINESS_TIMEZONE })}.`
-          : null,
+          : vehicleUpdate
+            ? `Vehicle: ${vehicleUpdate.vehicleYear} ${vehicleUpdate.vehicleMake} ${vehicleUpdate.vehicleModel}`
+            : null,
       },
     }),
   ]);

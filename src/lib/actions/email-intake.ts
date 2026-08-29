@@ -66,6 +66,13 @@ export async function processSimulatedEmail(
   const guessedName = !extractedName && email ? guessNameFromEmail(email) : "";
   const name = extractedName || existingLead?.name || closedLead?.name || guessedName;
 
+  // Vehicle details aren't required to log a lead (only to move it to
+  // QUALIFIED — see updateLeadStage) — just captured here when mentioned, so
+  // the QUALIFIED dialog has something to pre-fill instead of a blank form.
+  const vehicleMake = data.vehicle_make.trim().slice(0, MAX_LENGTHS.vehicleField) || closedLead?.vehicleMake || "";
+  const vehicleModel = data.vehicle_model.trim().slice(0, MAX_LENGTHS.vehicleField) || closedLead?.vehicleModel || "";
+  const vehicleYear = data.vehicle_year.trim().slice(0, MAX_LENGTHS.vehicleYear) || closedLead?.vehicleYear || "";
+
   // Deterministic gate — don't just trust the model's own read of what's missing.
   const missingFields: string[] = [];
   if (!name) missingFields.push("name");
@@ -114,6 +121,11 @@ export async function processSimulatedEmail(
           messages: { create: messagesData },
           suggestedLineItems: mergedSuggestions.length > 0 ? JSON.stringify(mergedSuggestions) : undefined,
           pendingQuoteMessage: acknowledgmentMessage,
+          // Fill gaps only — never overwrite a value staff may have already
+          // confirmed via the QUALIFIED dialog.
+          vehicleMake: !existingLead.vehicleMake && vehicleMake ? vehicleMake : undefined,
+          vehicleModel: !existingLead.vehicleModel && vehicleModel ? vehicleModel : undefined,
+          vehicleYear: !existingLead.vehicleYear && vehicleYear ? vehicleYear : undefined,
         },
       }),
       prisma.activity.create({ data: { leadId: existingLead.id, type: "NOTE", note } }),
@@ -163,6 +175,9 @@ export async function processSimulatedEmail(
       company: company || null,
       source: "EMAIL",
       previousLeadId: closedLead?.id ?? null,
+      vehicleMake: vehicleMake || null,
+      vehicleModel: vehicleModel || null,
+      vehicleYear: vehicleYear || null,
       suggestedLineItems: newSuggestedLineItems.length > 0 ? JSON.stringify(newSuggestedLineItems) : null,
       pendingQuoteMessage: acknowledgmentMessage,
       activities: { create: [{ type: "NOTE", note }] },

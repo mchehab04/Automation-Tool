@@ -5,6 +5,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   "QUALIFIED",
   "QUOTE_SENT",
   "SCHEDULED",
+  "IN_PROGRESS",
   "WON",
   "LOST",
 ];
@@ -14,6 +15,7 @@ export const STAGE_LABELS: Record<PipelineStage, string> = {
   QUALIFIED: "Qualified",
   QUOTE_SENT: "Quote Sent",
   SCHEDULED: "Scheduled",
+  IN_PROGRESS: "In Progress",
   // Won means the service was completed and the car was returned to the
   // customer — not just that the quote was accepted.
   WON: "Won",
@@ -26,7 +28,8 @@ export const STAGE_TRANSITIONS: Record<PipelineStage, PipelineStage[]> = {
   NEW: ["QUALIFIED", "LOST"],
   QUALIFIED: ["QUOTE_SENT", "LOST"],
   QUOTE_SENT: ["SCHEDULED", "LOST"],
-  SCHEDULED: ["WON", "LOST"],
+  SCHEDULED: ["IN_PROGRESS", "LOST"],
+  IN_PROGRESS: ["WON", "LOST"],
   WON: [],
   LOST: [],
 };

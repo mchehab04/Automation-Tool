@@ -114,3 +114,53 @@ points back — this file never edits history. Backfilled 2026-08-25 from the re
   is external account/credential setup (Google Cloud + Gmail API, n8n instance,
   Anthropic key, Slack workspace) — not started as of this log entry. Source:
   `docs/reports/05-email-intake-phase0-scoping.md`.
+
+## UAE market research reviewed, deferred pending a real pilot
+
+- **Date:** 2026-08-29
+- **Context:** User researched UAE auto-garage industry norms (WhatsApp-first
+  intake, pre-quote DVI, Genuine/OEM/Aftermarket parts tiering, insurance LPO
+  approval, 5% VAT + bilingual EN/AR receipts) and compared it against
+  `src/lib/pipeline.ts`. Confirmed exploratory — no concrete UAE pilot customer.
+- **Reason:** Ship the already-planned deploy on schedule rather than expand scope
+  for a market with no confirmed customer yet. Two findings (a missing
+  vehicle-in-shop/WIP pipeline stage, and vehicle make/model/year capture at
+  `QUALIFIED`) are real pipeline-correctness gaps independent of any specific
+  market, so those move to near-term backlog. Everything UAE-specific
+  (WhatsApp intake, DVI, parts tiering, insurance LPO, VAT/bilingual PDFs) is
+  deferred until there's an actual pilot — building compliance/localization
+  speculatively repeats the "premature ML" mistake from the original chatroom
+  debate, just in a different shape.
+- **Alternatives considered:** Building the UAE-specific items now, since the
+  research was already done — rejected; research having been done isn't the same
+  as a customer needing it.
+- **Risk / follow-up:** The app already has *some* UAE-specific behavior live
+  (`Asia/Dubai` hardcoded in `src/lib/timezone.ts`, per report 20's scheduling
+  fix — most likely anchored to the user's own timezone, not a deliberate
+  go-to-market bet, but worth knowing this isn't a clean hypothetical). If a real
+  UAE pilot does appear later, VAT compliance in particular jumps from "deferred"
+  to "required before any real transaction" — re-read
+  `docs/reports/22-uae-market-research-deferred.md` before assuming the same
+  priority order still holds. Source:
+  `docs/reports/22-uae-market-research-deferred.md`.
+
+## Added a WIP pipeline stage; vehicle details required at QUALIFIED
+
+- **Date:** 2026-08-29
+- **Context:** The two near-term-backlog items from the UAE research review
+  (report 22) — a missing "vehicle in-shop" stage and weak qualification
+  criteria — built out.
+- **Reason:** Both are real pipeline-correctness gaps independent of any specific
+  market. `SCHEDULED → WON` had no way to represent a multi-day job in progress.
+  "Qualified" meaning only "has a name and a way to reach them" is a weaker bar
+  than the word implies. User confirmed both gates should be hard requirements
+  (same pattern as the existing Won/Lost reason-code gate), not optional fields.
+- **Alternatives considered:** Optional vehicle fields with no gate — rejected,
+  doesn't fix the actual "qualified" bar. Vehicle details captured on the initial
+  lead-creation form instead of a QUALIFIED-transition dialog — rejected in favor
+  of mirroring the existing reason-code dialog pattern exactly. A quote-revision
+  workflow for scope changes discovered mid-job (raised in report 22's research) —
+  explicitly out of scope, just the stage itself for now.
+- **Risk / follow-up:** Any real lead already sitting at `SCHEDULED` in the live
+  database can now only move to `IN_PROGRESS`, not directly to `WON` — worth a
+  one-time check. Source: `docs/reports/23-wip-stage-and-vehicle-details.md`.

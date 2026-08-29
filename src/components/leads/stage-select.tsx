@@ -11,15 +11,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { updateLeadStage } from "@/lib/actions/leads";
 import { getAvailableSlots, type AvailableDay } from "@/lib/actions/scheduling";
 import { STAGE_LABELS, STAGE_TRANSITIONS, REASON_CODES } from "@/lib/pipeline";
+import { MAX_LENGTHS } from "@/lib/validation";
+import type { VehicleDetails } from "@/lib/vehicle";
 import { cn } from "@/lib/utils";
 import type { PipelineStage } from "@/generated/prisma/enums";
 
-export function StageSelect({ leadId, stage }: { leadId: string; stage: PipelineStage }) {
+export function StageSelect({
+  leadId,
+  stage,
+  vehicle,
+}: {
+  leadId: string;
+  stage: PipelineStage;
+  // Pre-fills the QUALIFIED dialog when AI intake already extracted these —
+  // staff confirm or correct rather than retype from scratch.
+  vehicle?: { make: string | null; model: string | null; year: string | null };
+}) {
   const [isPending, startTransition] = useTransition();
   const [pendingStage, setPendingStage] = useState<PipelineStage | null>(null);
   const [reasonCode, setReasonCode] = useState<string | null>(null);
@@ -27,9 +40,13 @@ export function StageSelect({ leadId, stage }: { leadId: string; stage: Pipeline
   const [availableDays, setAvailableDays] = useState<AvailableDay[] | null>(null);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
+  const [vehicleMake, setVehicleMake] = useState("");
+  const [vehicleModel, setVehicleModel] = useState("");
+  const [vehicleYear, setVehicleYear] = useState("");
   const nextStages = STAGE_TRANSITIONS[stage];
 
   const isScheduling = pendingStage === "SCHEDULED";
+  const isQualifying = pendingStage === "QUALIFIED";
   const loadingSlots = isScheduling && availableDays === null;
 
   useEffect(() => {
@@ -49,9 +66,9 @@ export function StageSelect({ leadId, stage }: { leadId: string; stage: Pipeline
     );
   }
 
-  const commit = (target: PipelineStage, code?: string, when?: string) => {
+  const commit = (target: PipelineStage, code?: string, when?: string, vehicleDetails?: VehicleDetails) => {
     startTransition(() => {
-      void updateLeadStage(leadId, target, code, when);
+      void updateLeadStage(leadId, target, code, when, vehicleDetails);
     });
   };
 
@@ -61,14 +78,23 @@ export function StageSelect({ leadId, stage }: { leadId: string; stage: Pipeline
     setAvailableDays(null);
     setSelectedDate("");
     setSelectedTime("");
+    setVehicleMake("");
+    setVehicleModel("");
+    setVehicleYear("");
   };
 
   const handleSelect = (value: PipelineStage) => {
-    // Won/Lost require a one-tap reason, and Scheduled requires an
-    // appointment time — every other transition is instant.
-    if (REASON_CODES[value] || value === "SCHEDULED") {
+    // Won/Lost require a one-tap reason, Scheduled requires an appointment
+    // time, Qualified requires the vehicle to be identified — every other
+    // transition is instant.
+    if (REASON_CODES[value] || value === "SCHEDULED" || value === "QUALIFIED") {
       setPendingStage(value);
       setReasonCode(null);
+      if (value === "QUALIFIED") {
+        setVehicleMake(vehicle?.make ?? "");
+        setVehicleModel(vehicle?.model ?? "");
+        setVehicleYear(vehicle?.year ?? "");
+      }
     } else {
       commit(value);
     }
@@ -83,6 +109,18 @@ export function StageSelect({ leadId, stage }: { leadId: string; stage: Pipeline
   const confirmSchedule = () => {
     if (!pendingStage || !selectedTime) return;
     commit(pendingStage, undefined, selectedTime);
+    closeDialog();
+  };
+
+  const isVehicleValid = vehicleMake.trim() && vehicleModel.trim() && vehicleYear.trim();
+
+  const confirmVehicle = () => {
+    if (!pendingStage || !isVehicleValid) return;
+    commit(pendingStage, undefined, undefined, {
+      make: vehicleMake.trim(),
+      model: vehicleModel.trim(),
+      year: vehicleYear.trim(),
+    });
     closeDialog();
   };
 
@@ -176,6 +214,57 @@ export function StageSelect({ leadId, stage }: { leadId: string; stage: Pipeline
                   Cancel
                 </Button>
                 <Button onClick={confirmSchedule} disabled={!selectedTime}>
+                  Confirm
+                </Button>
+              </DialogFooter>
+            </>
+          ) : isQualifying ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Which vehicle is this?</DialogTitle>
+                <DialogDescription>
+                  Qualified means the vehicle is identified, not just the contact —
+                  required before this lead moves forward.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="vehicleMake">Make</Label>
+                  <Input
+                    id="vehicleMake"
+                    value={vehicleMake}
+                    onChange={(e) => setVehicleMake(e.target.value)}
+                    placeholder="Toyota"
+                    maxLength={MAX_LENGTHS.vehicleField}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="vehicleModel">Model</Label>
+                  <Input
+                    id="vehicleModel"
+                    value={vehicleModel}
+                    onChange={(e) => setVehicleModel(e.target.value)}
+                    placeholder="Camry"
+                    maxLength={MAX_LENGTHS.vehicleField}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="vehicleYear">Year</Label>
+                  <Input
+                    id="vehicleYear"
+                    value={vehicleYear}
+                    onChange={(e) => setVehicleYear(e.target.value.replace(/\D/g, ""))}
+                    placeholder="2019"
+                    inputMode="numeric"
+                    maxLength={MAX_LENGTHS.vehicleYear}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={closeDialog}>
+                  Cancel
+                </Button>
+                <Button onClick={confirmVehicle} disabled={!isVehicleValid}>
                   Confirm
                 </Button>
               </DialogFooter>

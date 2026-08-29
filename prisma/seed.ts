@@ -17,15 +17,19 @@ const DEMO_LEADS: Array<{
   company: string;
   stage: "NEW" | "QUALIFIED" | "QUOTE_SENT" | "WON" | "LOST";
   daysAgo: number;
+  // Only present from QUALIFIED onward — vehicle details are required to
+  // reach that stage (see updateLeadStage), so NEW/never-qualified LOST
+  // leads correctly have none.
+  vehicle?: { make: string; model: string; year: string };
 }> = [
   { name: "Amara Chen", email: "amara@brightwood.co", company: "Brightwood Interiors", stage: "NEW", daysAgo: 1 },
   { name: "Diego Ramos", email: "diego@ramosauto.com", company: "Ramos Auto Detailing", stage: "NEW", daysAgo: 2 },
-  { name: "Priya Nair", email: "priya@nairconsulting.com", company: "Nair Consulting", stage: "QUALIFIED", daysAgo: 4 },
-  { name: "Tom Whitfield", email: "tom@whitfieldbuild.co", company: "Whitfield Build Co.", stage: "QUALIFIED", daysAgo: 6 },
-  { name: "Sofia Marchetti", email: "sofia@marchettievents.com", company: "Marchetti Events", stage: "QUOTE_SENT", daysAgo: 8 },
-  { name: "Liam O'Connor", email: "liam@oconnorlandscaping.com", company: "O'Connor Landscaping", stage: "QUOTE_SENT", daysAgo: 10 },
-  { name: "Hana Suzuki", email: "hana@suzukidesign.jp", company: "Suzuki Design Studio", stage: "WON", daysAgo: 14 },
-  { name: "Marcus Bell", email: "marcus@bellrealty.com", company: "Bell Realty Group", stage: "WON", daysAgo: 20 },
+  { name: "Priya Nair", email: "priya@nairconsulting.com", company: "Nair Consulting", stage: "QUALIFIED", daysAgo: 4, vehicle: { make: "Honda", model: "Civic", year: "2020" } },
+  { name: "Tom Whitfield", email: "tom@whitfieldbuild.co", company: "Whitfield Build Co.", stage: "QUALIFIED", daysAgo: 6, vehicle: { make: "Ford", model: "F-150", year: "2018" } },
+  { name: "Sofia Marchetti", email: "sofia@marchettievents.com", company: "Marchetti Events", stage: "QUOTE_SENT", daysAgo: 8, vehicle: { make: "Toyota", model: "Camry", year: "2021" } },
+  { name: "Liam O'Connor", email: "liam@oconnorlandscaping.com", company: "O'Connor Landscaping", stage: "QUOTE_SENT", daysAgo: 10, vehicle: { make: "Nissan", model: "Altima", year: "2019" } },
+  { name: "Hana Suzuki", email: "hana@suzukidesign.jp", company: "Suzuki Design Studio", stage: "WON", daysAgo: 14, vehicle: { make: "Mazda", model: "CX-5", year: "2022" } },
+  { name: "Marcus Bell", email: "marcus@bellrealty.com", company: "Bell Realty Group", stage: "WON", daysAgo: 20, vehicle: { make: "BMW", model: "3 Series", year: "2017" } },
   { name: "Elena Popescu", email: "elena@popescucatering.ro", company: "Popescu Catering", stage: "LOST", daysAgo: 18 },
 ];
 
@@ -67,6 +71,9 @@ async function main() {
         company: demo.company,
         stage: demo.stage,
         source: "MANUAL",
+        vehicleMake: demo.vehicle?.make ?? null,
+        vehicleModel: demo.vehicle?.model ?? null,
+        vehicleYear: demo.vehicle?.year ?? null,
         createdAt,
         updatedAt: createdAt,
       },

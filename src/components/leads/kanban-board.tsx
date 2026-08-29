@@ -12,7 +12,7 @@ export function KanbanBoard({ leads }: { leads: Lead[] }) {
   }));
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
       {columns.map(({ stage, leads: stageLeads }) => (
         <div key={stage} className="flex flex-col gap-3">
           <div className="flex items-center justify-between px-1">
@@ -43,7 +43,11 @@ export function KanbanBoard({ leads }: { leads: Lead[] }) {
                     ) : null}
                   </CardHeader>
                   <CardContent className="px-3">
-                    <StageSelect leadId={lead.id} stage={lead.stage} />
+                    <StageSelect
+                      leadId={lead.id}
+                      stage={lead.stage}
+                      vehicle={{ make: lead.vehicleMake, model: lead.vehicleModel, year: lead.vehicleYear }}
+                    />
                   </CardContent>
                 </Card>
               ))

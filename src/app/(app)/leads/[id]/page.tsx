@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FileText, ArrowLeft, Mail, Phone, Building2, Sparkles } from "lucide-react";
+import { FileText, ArrowLeft, Mail, Phone, Building2, Sparkles, Car } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
 } from "@/lib/pipeline";
 import { BUSINESS_TIMEZONE } from "@/lib/timezone";
 import { defaultQuoteMessage } from "@/lib/quote-message";
+import { formatVehicle } from "@/lib/vehicle";
 
 export default async function LeadDetailPage({
   params,
@@ -127,6 +128,16 @@ export default async function LeadDetailPage({
                   <Building2 className="size-4 text-muted-foreground" /> {lead.company}
                 </div>
               ) : null}
+              {lead.vehicleMake || lead.vehicleModel || lead.vehicleYear ? (
+                <div className="flex items-center gap-2">
+                  <Car className="size-4 text-muted-foreground" />
+                  {formatVehicle({
+                    make: lead.vehicleMake ?? "",
+                    model: lead.vehicleModel ?? "",
+                    year: lead.vehicleYear ?? "",
+                  })}
+                </div>
+              ) : null}
               {!lead.email && !lead.phone && !lead.company ? (
                 <p className="text-muted-foreground">No contact details on file.</p>
               ) : null}
@@ -144,7 +155,11 @@ export default async function LeadDetailPage({
                   Appointment: {lead.scheduledAt.toLocaleString("en-US", { timeZone: BUSINESS_TIMEZONE })}
                 </p>
               ) : null}
-              <StageSelect leadId={lead.id} stage={lead.stage} />
+              <StageSelect
+                leadId={lead.id}
+                stage={lead.stage}
+                vehicle={{ make: lead.vehicleMake, model: lead.vehicleModel, year: lead.vehicleYear }}
+              />
             </CardContent>
           </Card>
 

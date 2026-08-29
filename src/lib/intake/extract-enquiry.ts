@@ -16,6 +16,9 @@ export type ExtractedEnquiry = {
   email: string;
   phone: string;
   company: string;
+  vehicle_make: string;
+  vehicle_model: string;
+  vehicle_year: string;
   summary: string;
   draft_reply: string;
   acknowledgment_message: string;
@@ -38,6 +41,9 @@ const EXTRACT_TOOL = {
       email: { type: "string" as const, description: "Customer's email address, empty string if unknown." },
       phone: { type: "string" as const, description: "Customer's phone number, empty string if unknown." },
       company: { type: "string" as const, description: "Customer's company, empty string if not applicable." },
+      vehicle_make: { type: "string" as const, description: "Vehicle's make (e.g. \"Toyota\"), empty string if not mentioned." },
+      vehicle_model: { type: "string" as const, description: "Vehicle's model (e.g. \"Camry\"), empty string if not mentioned." },
+      vehicle_year: { type: "string" as const, description: "Vehicle's model year, digits only (e.g. \"2019\"), empty string if not mentioned." },
       summary: {
         type: "string" as const,
         description: "One or two sentence summary of what the customer wants.",
@@ -86,6 +92,9 @@ const EXTRACT_TOOL = {
       "email",
       "phone",
       "company",
+      "vehicle_make",
+      "vehicle_model",
+      "vehicle_year",
       "summary",
       "draft_reply",
       "acknowledgment_message",
@@ -100,7 +109,8 @@ const SYSTEM_PROMPTS = {
   // body, and a lead can't be logged until enough of that is present.
   simulated:
     "You triage inbound customer messages for an auto dealership/garage's sales pipeline. " +
-    "Extract the customer's contact details and what they need. A lead can only be logged " +
+    "Extract the customer's contact details, their vehicle's make/model/year if mentioned, " +
+    "and what they need. A lead can only be logged " +
     "once you have a name and at least one way to reach them (email or phone) — if the " +
     "thread doesn't have those yet, draft a short, friendly reply asking for whatever is " +
     "missing. Once you have everything needed to log the lead, instead draft a short " +
@@ -110,7 +120,8 @@ const SYSTEM_PROMPTS = {
   // can and describe what the customer needs.
   real:
     "You triage inbound customer emails for an auto dealership/garage's sales pipeline. " +
-    "Extract the customer's name and what they need. The sender's email address is already " +
+    "Extract the customer's name, their vehicle's make/model/year if mentioned, and what " +
+    "they need. The sender's email address is already " +
     "known from the message headers, so don't worry about whether contact info is present — " +
     "focus on summarizing the request and, if anything about it is unclear, drafting a short, " +
     "friendly clarifying question. When nothing about the request is unclear, instead draft a " +

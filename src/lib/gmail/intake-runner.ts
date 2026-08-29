@@ -167,6 +167,13 @@ async function processOneMessage(
   const clarifyingNote = draftReply ? ` A clarifying question worth asking: "${draftReply}"` : "";
   const acknowledgmentMessage = data.acknowledgment_message.trim();
 
+  // See email-intake.ts's simulated path for the same pattern — not required
+  // to log a lead, just captured when mentioned so the QUALIFIED dialog has
+  // something to pre-fill.
+  const vehicleMake = data.vehicle_make.trim().slice(0, MAX_LENGTHS.vehicleField) || closedLead?.vehicleMake || "";
+  const vehicleModel = data.vehicle_model.trim().slice(0, MAX_LENGTHS.vehicleField) || closedLead?.vehicleModel || "";
+  const vehicleYear = data.vehicle_year.trim().slice(0, MAX_LENGTHS.vehicleYear) || closedLead?.vehicleYear || "";
+
   // The model was given whatever was already drafted and asked to return the
   // full corrected picture, not just an addition — so this replaces rather
   // than merges, which is what actually fixes a follow-up that clarifies
@@ -194,6 +201,11 @@ async function processOneMessage(
             // Replaced, not merged — a reply is one current draft, not a list.
             pendingReplyText: draftReply || undefined,
             pendingQuoteMessage: acknowledgmentMessage || undefined,
+            // Fill gaps only — never overwrite a value staff may have
+            // already confirmed via the QUALIFIED dialog.
+            vehicleMake: !existingLead.vehicleMake && vehicleMake ? vehicleMake : undefined,
+            vehicleModel: !existingLead.vehicleModel && vehicleModel ? vehicleModel : undefined,
+            vehicleYear: !existingLead.vehicleYear && vehicleYear ? vehicleYear : undefined,
           },
         }),
         prisma.activity.create({ data: { leadId: existingLead.id, type: "NOTE", note } }),
@@ -236,6 +248,9 @@ async function processOneMessage(
           company: company || null,
           source: "EMAIL",
           previousLeadId: closedLead?.id ?? null,
+          vehicleMake: vehicleMake || null,
+          vehicleModel: vehicleModel || null,
+          vehicleYear: vehicleYear || null,
           suggestedLineItems:
             updatedSuggestedLineItems.length > 0 ? JSON.stringify(updatedSuggestedLineItems) : null,
           pendingReplyText: draftReply || null,

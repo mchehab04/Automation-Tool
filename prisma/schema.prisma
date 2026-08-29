@@ -61,6 +61,14 @@ enum PipelineStage {
   // A service appointment has been booked — Won now means the service was
   // completed and the car was returned, not just that the quote was accepted.
   SCHEDULED
+  // Vehicle is physically at the shop and being worked on. Sits between a
+  // booked appointment and Won specifically because that gap can span days
+  // and the scope of work can still change (supplementary repairs found
+  // mid-job) — without this stage there was no way to represent "car's here,
+  // not done yet" at all. Deliberately just the stage itself for now, not a
+  // quote-revision workflow for mid-job scope changes — that's a separate,
+  // larger feature.
+  IN_PROGRESS
   WON
   LOST
 }
@@ -80,6 +88,13 @@ model Lead {
   company            String?
   source             LeadSource    @default(MANUAL)
   stage              PipelineStage @default(NEW)
+  // Required to move a lead to QUALIFIED (see updateLeadStage) — "qualified"
+  // means the vehicle is identified, not just that contact info exists.
+  // AI intake (extractEnquiry) fills these when mentioned; the QUALIFIED
+  // dialog lets staff confirm/edit or fill them in for manual leads.
+  vehicleMake        String?
+  vehicleModel       String?
+  vehicleYear        String?
   // JSON-encoded array of { description, unitPrice } suggested by AI email
   // intake, offered as a starting point for the first quote — never applied
   // without a human generating the quote themselves.
