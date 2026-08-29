@@ -26,12 +26,14 @@ export async function renderQuotePdf(quoteId: string) {
     createElement(QuoteDocument, {
       quoteNumber,
       businessName: quote.lead.business.name,
+      businessAddress: quote.lead.business.address,
       lead: {
         name: quote.lead.name,
         email: quote.lead.email,
         company: quote.lead.company,
       },
       lineItems,
+      notes: quote.notes,
       totalAmount: quote.totalAmount,
       currency: quote.currency,
       generatedAt: quote.generatedAt,

@@ -32,6 +32,8 @@ still deferred (single `demo-business` hardcoded throughout).
 | 08 | Postgres Migration | 2026-08-25 | `docs/reports/08-postgres-migration.md` | Swapped SQLite for Postgres (Vercel/Neon); dropped SQLite migration history; fixed a dead-IPv6-route connectivity issue |
 | 22 | UAE Market Research: Deferred Pending a Real Pilot | 2026-08-29 | `docs/reports/22-uae-market-research-deferred.md` | Reviewed UAE auto-garage market research; deferred all UAE-specific build work pending a real pilot; flagged WIP stage + vehicle details as near-term backlog regardless |
 | 23 | WIP Pipeline Stage and Vehicle Details at QUALIFIED | 2026-08-29 | `docs/reports/23-wip-stage-and-vehicle-details.md` | Added IN_PROGRESS stage between SCHEDULED and WON; vehicle make/model/year now required to reach QUALIFIED |
+| 24 | Manual Lead: Required Contact Info + AI Quote Suggestions | 2026-08-29 | `docs/reports/24-manual-lead-required-contact-and-ai-suggestions.md` | Email/phone now required on manual lead creation; staff notes now run through AI for quote-suggestion + vehicle extraction |
+| 25 | Quote PDF Redesign: Layout, Business Address, Notes, VAT | 2026-08-29 | `docs/reports/25-quote-pdf-redesign-and-vat.md` | Redesigned quote PDF layout; added Business.address + Quote.notes; added display-only 5% VAT breakdown |
 
 **Gap: reports 09 through 21 are not indexed here yet.** Substantial work landed
 in that range without going through this index/decision-log update step — quote
@@ -45,7 +47,7 @@ table as incomplete until that catch-up pass happens.
 Note: `02`, `05`, `06`, and `08` are each used twice or more in the existing
 history — that numbering drift predates this index and isn't being corrected
 retroactively (would misrepresent when things actually happened). New reports
-should number forward from `23`.
+should number forward from `25`.
 
 ## Decisions
 

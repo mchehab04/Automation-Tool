@@ -26,6 +26,8 @@ export async function createQuote(leadId: string, formData: FormData) {
     throw new Error("A quote needs at least one line item.");
   }
 
+  const notes = String(formData.get("notes") ?? "").trim().slice(0, MAX_LENGTHS.quoteNotes);
+
   const totalAmount = lineItems.reduce(
     (sum, item) => sum + item.unitPrice * item.quantity,
     0,
@@ -42,6 +44,7 @@ export async function createQuote(leadId: string, formData: FormData) {
       leadId,
       number,
       lineItems: JSON.stringify(lineItems),
+      notes: notes || null,
       totalAmount,
       currency: "USD",
     },

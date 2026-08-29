@@ -51,17 +51,21 @@ export function LeadForm() {
           ? `Keep it under ${MAX_LENGTHS.name} characters.`
           : undefined,
     email:
-      values.email.length > MAX_LENGTHS.email
-        ? `Keep it under ${MAX_LENGTHS.email} characters.`
-        : !isValidEmail(values.email)
-          ? "That doesn't look like a valid email."
-          : undefined,
+      values.email.trim().length === 0
+        ? "Email is required."
+        : values.email.length > MAX_LENGTHS.email
+          ? `Keep it under ${MAX_LENGTHS.email} characters.`
+          : !isValidEmail(values.email)
+            ? "That doesn't look like a valid email."
+            : undefined,
     phone:
-      values.phone.length > MAX_LENGTHS.phone
-        ? `Keep it under ${MAX_LENGTHS.phone} characters.`
-        : !isValidPhone(values.phone)
-          ? "That doesn't look like a valid phone number."
-          : undefined,
+      values.phone.trim().length === 0
+        ? "Phone is required."
+        : values.phone.length > MAX_LENGTHS.phone
+          ? `Keep it under ${MAX_LENGTHS.phone} characters.`
+          : !isValidPhone(values.phone)
+            ? "That doesn't look like a valid phone number."
+            : undefined,
     company:
       values.company.length > MAX_LENGTHS.company
         ? `Keep it under ${MAX_LENGTHS.company} characters.`
@@ -131,7 +135,9 @@ export function LeadForm() {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">
+          Email <span className="text-destructive">*</span>
+        </Label>
         <div ref={emailRef} className="t-input">
           <Input
             {...bind("email")}
@@ -147,7 +153,9 @@ export function LeadForm() {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="phone">Phone</Label>
+        <Label htmlFor="phone">
+          Phone <span className="text-destructive">*</span>
+        </Label>
         <div ref={phoneRef} className="t-input">
           <Input
             {...bind("phone")}

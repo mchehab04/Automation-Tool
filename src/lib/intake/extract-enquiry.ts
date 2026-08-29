@@ -129,6 +129,22 @@ const SYSTEM_PROMPTS = {
     "that case). If the message includes this business's service price " +
     "catalogue, ground your suggested line items in it wherever the customer's request " +
     "matches an entry.",
+  // A staff member is manually logging a lead whose contact info they already
+  // typed into the form themselves — this mode only exists to turn their free-
+  // text note into quote-suggestion grounding, not to triage a customer
+  // message. is_enquiry/name/email/phone/company/draft_reply/
+  // acknowledgment_message are unused by the caller here; return them empty
+  // (is_enquiry true) rather than spend effort inferring them.
+  manual:
+    "A staff member at an auto dealership/garage is manually logging a new lead and wrote a " +
+    "short note describing what the customer needs. Extract the vehicle's make/model/year if " +
+    "mentioned, and suggest a rough starting point for a quote based on the note. Leave name, " +
+    "email, phone, company, draft_reply, and acknowledgment_message empty — this isn't a " +
+    "customer message being triaged, contact info was already entered separately. Set " +
+    "is_enquiry to true unless the note is clearly unrelated to a service request (e.g. an " +
+    "internal reminder with nothing about what the customer needs), in which case leave " +
+    "suggested_line_items empty too. If the note includes this business's service price " +
+    "catalogue, ground your suggested line items in it wherever the note matches an entry.",
 } as const;
 
 export type ExistingSuggestion = { description: string; quantity: string; unitPrice: string };

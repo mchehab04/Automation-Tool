@@ -46,7 +46,13 @@ async function main() {
   const business = await prisma.business.upsert({
     where: { id: "demo-business" },
     update: {},
-    create: { id: "demo-business", name: "Demo Business", category: "AUTO_GARAGE" },
+    create: {
+      id: "demo-business",
+      name: "Demo Business",
+      category: "AUTO_GARAGE",
+      // Placeholder — swap for the real address once known (see report 25).
+      address: "123 Industrial Area 3, Al Quoz, Dubai, UAE",
+    },
   });
 
   // Delete-then-recreate keeps this safely re-runnable without needing a

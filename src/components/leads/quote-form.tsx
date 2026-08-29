@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Plus, Trash2, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { FieldFooter } from "@/components/forms/field-footer";
 import { replayShake } from "@/components/forms/shake";
@@ -56,6 +57,7 @@ export function QuoteForm({
       ? suggestedLineItems.map(suggestedRow)
       : [emptyRow()],
   );
+  const [notes, setNotes] = useState("");
   const shakeRefs = useRef(new Map<number, HTMLDivElement>());
 
   const shakeRow = (id: number) => replayShake(shakeRefs.current.get(id) ?? null);
@@ -173,6 +175,20 @@ export function QuoteForm({
       <Button type="button" variant="outline" size="sm" className="self-start" onClick={addRow}>
         <Plus className="size-4" /> Add line item
       </Button>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="notes">Notes (optional)</Label>
+        <Textarea
+          id="notes"
+          name="notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Warranty terms, payment instructions, anything else worth printing on the quote…"
+          rows={2}
+          maxLength={MAX_LENGTHS.quoteNotes + 50}
+        />
+        <FieldFooter count={notes.length} max={MAX_LENGTHS.quoteNotes} />
+      </div>
 
       <div className="flex items-center justify-between border-t pt-3">
         <span className="text-sm text-muted-foreground">Total</span>

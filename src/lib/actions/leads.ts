@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { STAGE_TRANSITIONS, REASON_CODES } from "@/lib/pipeline";
 import { generateClosingReport } from "@/lib/actions/lead-report";
+import { extractEnquiry, type CatalogItem } from "@/lib/intake/extract-enquiry";
+import { buildSuggestedLineItems } from "@/lib/intake/lead-matching";
 import {
   MAX_LENGTHS,
   isValidEmail,
@@ -28,24 +30,62 @@ export async function createLead(formData: FormData) {
   if (!name) {
     throw new Error("Lead name is required.");
   }
-  if (emailRaw && !isValidEmail(emailRaw)) {
+  if (!emailRaw) {
+    throw new Error("Email is required.");
+  }
+  if (!isValidEmail(emailRaw)) {
     throw new Error("That doesn't look like a valid email.");
   }
-  if (phoneRaw && !isValidPhone(phoneRaw)) {
+  if (!phoneRaw) {
+    throw new Error("Phone is required.");
+  }
+  if (!isValidPhone(phoneRaw)) {
     throw new Error("That doesn't look like a valid phone number.");
   }
 
-  const email = emailRaw ? normalizeEmail(emailRaw) : "";
-  const phone = phoneRaw ? normalizePhone(phoneRaw) : "";
+  const email = normalizeEmail(emailRaw);
+  const phone = normalizePhone(phoneRaw);
+
+  // Best-effort: turn the staff-written note into quote-suggestion grounding,
+  // same as email intake does with a customer's message. A failure here
+  // shouldn't block the lead actually getting created (same "don't let AI
+  // failure block the real action" pattern as generateClosingReport).
+  let suggestedLineItems: string | undefined;
+  let vehicleMake: string | null = null;
+  let vehicleModel: string | null = null;
+  let vehicleYear: string | null = null;
+  if (note) {
+    try {
+      const catalogItemsRaw = await prisma.serviceCatalogItem.findMany({
+        where: { businessId: DEMO_BUSINESS_ID },
+      });
+      const catalogItems: CatalogItem[] = catalogItemsRaw.map((item) => ({
+        description: item.description,
+        unitPrice: String(Math.round(item.unitPrice / 100)),
+      }));
+      const data = await extractEnquiry(note, "manual", undefined, catalogItems);
+      const items = buildSuggestedLineItems(data.suggested_line_items);
+      if (items.length > 0) suggestedLineItems = JSON.stringify(items);
+      vehicleMake = data.vehicle_make.trim().slice(0, MAX_LENGTHS.vehicleField) || null;
+      vehicleModel = data.vehicle_model.trim().slice(0, MAX_LENGTHS.vehicleField) || null;
+      vehicleYear = data.vehicle_year.trim().slice(0, MAX_LENGTHS.vehicleYear) || null;
+    } catch (err) {
+      console.error("Failed to generate quote suggestions for manual lead", err);
+    }
+  }
 
   const lead = await prisma.lead.create({
     data: {
       businessId: DEMO_BUSINESS_ID,
       name,
-      email: email || null,
-      phone: phone || null,
+      email,
+      phone,
       company: company || null,
       source: "MANUAL",
+      suggestedLineItems,
+      vehicleMake,
+      vehicleModel,
+      vehicleYear,
       activities: note
         ? { create: [{ type: "NOTE", note }] }
         : undefined,

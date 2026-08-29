@@ -13,7 +13,7 @@ export default function NewLeadPage() {
       <Card>
         <CardHeader>
           <CardTitle>Lead details</CardTitle>
-          <CardDescription>Name is required — everything else is optional.</CardDescription>
+          <CardDescription>Name, email, and phone are required — company and note are optional.</CardDescription>
         </CardHeader>
         <CardContent>
           <LeadForm />

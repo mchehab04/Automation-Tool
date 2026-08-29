@@ -23,6 +23,8 @@ enum BusinessCategory {
 model Business {
   id        String           @id @default(cuid())
   name      String
+  // Printed on the quote PDF, under the business name (top left).
+  address   String?
   category  BusinessCategory @default(AUTO_GARAGE)
   createdAt DateTime         @default(now())
 
@@ -184,6 +186,13 @@ model Quote {
   leadId        String
   lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   lineItems     String   // JSON-encoded array of { description, quantity, unitPrice }
+  // Staff-authored free text (e.g. warranty terms), printed on the PDF
+  // between the customer info and the line-item table when present.
+  notes         String?
+  // Pre-VAT subtotal — unchanged meaning. VAT (5%) and the grand total are
+  // computed at PDF-render time only, never stored, so existing quotes'
+  // recorded totals stay exactly what was actually quoted before VAT display
+  // was added.
   totalAmount   Int      // stored in cents to avoid float rounding issues
   currency      String   @default("USD")
   generatedAt   DateTime @default(now())
