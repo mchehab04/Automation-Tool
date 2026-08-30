@@ -37,6 +37,7 @@ export const STAGE_TRANSITIONS: Record<PipelineStage, PipelineStage[]> = {
 export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
   MANUAL: "Manual",
   EMAIL: "Email",
+  WHATSAPP: "WhatsApp",
 };
 
 export type ReasonCode = { code: string; label: string };

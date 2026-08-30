@@ -56,7 +56,7 @@ const EXTRACT_TOOL = {
       acknowledgment_message: {
         type: "string" as const,
         description:
-          "Written as the ENTIRE email body that will accompany the quote once one is prepared — references what the customer asked about, mentions a quote is attached, warm and short (2-4 sentences). No separate greeting/sign-off is appended afterward, so include it here. Populate this ONLY when draft_reply is empty (nothing is missing or unclear) — the two are mutually exclusive. Empty string if draft_reply is non-empty, or if is_enquiry is false.",
+          "Written as the ENTIRE message that will accompany the quote once one is prepared — references what the customer asked about, mentions a quote is attached or on its way, warm and short. No separate greeting/sign-off is appended afterward, so include it here. Populate this ONLY when draft_reply is empty (nothing is missing or unclear) — the two are mutually exclusive. Empty string if draft_reply is non-empty, or if is_enquiry is false.",
       },
       suggested_line_items: {
         type: "array" as const,
@@ -129,6 +129,20 @@ const SYSTEM_PROMPTS = {
     "that case). If the message includes this business's service price " +
     "catalogue, ground your suggested line items in it wherever the customer's request " +
     "matches an entry.",
+  // Same "contact info already known" framing as `real` — a WhatsApp
+  // webhook payload always carries the sender's phone number — but with
+  // WhatsApp-appropriate tone/length instead of email wording.
+  whatsapp:
+    "You triage inbound customer WhatsApp messages for an auto dealership/garage's sales pipeline. " +
+    "Extract the customer's name, their vehicle's make/model/year if mentioned, and what they " +
+    "need. The sender's phone number is already known from the WhatsApp message, so don't worry " +
+    "about whether contact info is present — focus on summarizing the request and, if anything " +
+    "about it is unclear, drafting a short, friendly clarifying question. Keep any drafted message " +
+    "brief and conversational, the way people actually text — no email-style greeting or sign-off, " +
+    "1-2 short sentences rather than a paragraph. When nothing about the request is unclear, " +
+    "instead draft a short acknowledgment_message that will accompany the quote (skip draft_reply " +
+    "in that case). If the message includes this business's service price catalogue, ground your " +
+    "suggested line items in it wherever the customer's request matches an entry.",
   // A staff member is manually logging a lead whose contact info they already
   // typed into the form themselves — this mode only exists to turn their free-
   // text note into quote-suggestion grounding, not to triage a customer

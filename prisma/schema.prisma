@@ -78,6 +78,7 @@ enum PipelineStage {
 enum LeadSource {
   MANUAL
   EMAIL
+  WHATSAPP
 }
 
 model Lead {
@@ -97,13 +98,14 @@ model Lead {
   vehicleMake        String?
   vehicleModel       String?
   vehicleYear        String?
-  // JSON-encoded array of { description, unitPrice } suggested by AI email
+  // JSON-encoded array of { description, unitPrice } suggested by AI
   // intake, offered as a starting point for the first quote — never applied
   // without a human generating the quote themselves.
   suggestedLineItems String?
-  // AI-drafted clarifying reply awaiting staff review (real Gmail intake
-  // only) — cleared once accepted/sent via sendPendingReply. Replaced, not
-  // merged, on a new message: a reply is one current draft, not a list.
+  // AI-drafted clarifying reply awaiting staff review (real intake only,
+  // not the simulator) — cleared once accepted/sent via sendPendingReply.
+  // Replaced, not merged, on a new message: a reply is one current draft,
+  // not a list.
   pendingReplyText   String?
   // AI-drafted message to accompany a quote, populated at intake time
   // whenever nothing was missing/unclear (the complement of
@@ -155,9 +157,11 @@ model Message {
   lead      Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
   role      MessageRole
   text      String
-  // RFC Message-ID header for real inbound email — makes intake idempotent
-  // against reprocessing (e.g. an IMAP \Seen flag not getting set in time).
-  // NULL for simulated messages, which have no such header.
+  // A channel-specific idempotency key for real inbound messages — the RFC
+  // Message-ID header for email, WhatsApp's message ID for WhatsApp — used
+  // to make intake idempotent against reprocessing (e.g. an IMAP \Seen flag
+  // not getting set in time). NULL for simulated messages, which have no
+  // such identifier.
   externalId String?     @unique
   createdAt DateTime    @default(now())
 
@@ -211,7 +215,7 @@ enum NotificationType {
   NEW_MESSAGE
   // A quote was generated and is ready to be emailed to the customer.
   QUOTE_SEND_PENDING
-  // Real Gmail intake drafted a clarifying reply awaiting staff review.
+  // Real intake drafted a clarifying reply awaiting staff review.
   REPLY_SEND_PENDING
   // A thank-you message drafted for a just-closed lead is awaiting review.
   THANK_YOU_SEND_PENDING
