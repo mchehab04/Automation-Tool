@@ -164,3 +164,26 @@ points back — this file never edits history. Backfilled 2026-08-25 from the re
 - **Risk / follow-up:** Any real lead already sitting at `SCHEDULED` in the live
   database can now only move to `IN_PROGRESS`, not directly to `WON` — worth a
   one-time check. Source: `docs/reports/23-wip-stage-and-vehicle-details.md`.
+
+## Removed fabricated TRN/warranty/WhatsApp content from the quote PDF
+
+- **Date:** 2026-08-29
+- **Context:** A quote PDF redesign landed outside this conversation (between
+  reports 25 and 26) with a hardcoded fake UAE TRN, an invented specific
+  warranty claim, and a reference to confirming quotes via WhatsApp — a channel
+  that doesn't exist in this app.
+- **Reason:** A TRN is a real, verifiable regulatory identifier — printing a
+  fabricated one on a document a real customer could receive and try to verify
+  is a materially different risk than a labeled placeholder (like the demo
+  business address, which the user knowingly chose as a stand-in). Same
+  reasoning for the warranty claim (a business commitment nobody actually made)
+  and the WhatsApp reference (a customer following that instruction would be
+  ignored). Matches this project's established precedent against fabricating
+  business-facing content (report 03).
+- **Alternatives considered:** Keeping the fields since they made the document
+  look more complete — rejected; looking more complete by stating unconfirmed
+  facts is the actual problem, not a stylistic tradeoff.
+- **Risk / follow-up:** The improved card-based layout, VAT breakdown, and quote
+  validity date were kept — none of those were fabricated claims, just real
+  computed values or a real placeholder in a real field. Source:
+  `docs/reports/26-quote-pdf-fabricated-fields-removed.md`.

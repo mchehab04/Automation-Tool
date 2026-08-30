@@ -22,6 +22,10 @@ export async function renderQuotePdf(quoteId: string) {
   const lineItems = JSON.parse(quote.lineItems) as QuoteLineItem[];
   const quoteNumber = quote.number ?? 0;
 
+  // 14-day validity period from date of generation
+  const validUntil = new Date(quote.generatedAt);
+  validUntil.setDate(validUntil.getDate() + 14);
+
   const buffer = await renderToBuffer(
     createElement(QuoteDocument, {
       quoteNumber,
@@ -30,13 +34,20 @@ export async function renderQuotePdf(quoteId: string) {
       lead: {
         name: quote.lead.name,
         email: quote.lead.email,
+        phone: quote.lead.phone,
         company: quote.lead.company,
+        vehicle: {
+          make: quote.lead.vehicleMake,
+          model: quote.lead.vehicleModel,
+          year: quote.lead.vehicleYear,
+        },
       },
       lineItems,
       notes: quote.notes,
       totalAmount: quote.totalAmount,
       currency: quote.currency,
       generatedAt: quote.generatedAt,
+      validUntil,
     }) as unknown as ReactElement<DocumentProps>,
   );
 

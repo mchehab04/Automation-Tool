@@ -34,6 +34,10 @@ still deferred (single `demo-business` hardcoded throughout).
 | 23 | WIP Pipeline Stage and Vehicle Details at QUALIFIED | 2026-08-29 | `docs/reports/23-wip-stage-and-vehicle-details.md` | Added IN_PROGRESS stage between SCHEDULED and WON; vehicle make/model/year now required to reach QUALIFIED |
 | 24 | Manual Lead: Required Contact Info + AI Quote Suggestions | 2026-08-29 | `docs/reports/24-manual-lead-required-contact-and-ai-suggestions.md` | Email/phone now required on manual lead creation; staff notes now run through AI for quote-suggestion + vehicle extraction |
 | 25 | Quote PDF Redesign: Layout, Business Address, Notes, VAT | 2026-08-29 | `docs/reports/25-quote-pdf-redesign-and-vat.md` | Redesigned quote PDF layout; added Business.address + Quote.notes; added display-only 5% VAT breakdown |
+| 26 | Quote PDF: Removed Fabricated Fields | 2026-08-29 | `docs/reports/26-quote-pdf-fabricated-fields-removed.md` | Removed a hardcoded fake TRN, an invented warranty claim, a nonexistent WhatsApp channel reference, and other filler text from an out-of-band PDF redesign, keeping the improved layout |
+| 27 | Business Settings Page (Address + Service Catalogue Admin) | 2026-08-29 | `docs/reports/27-business-settings-page.md` | New /settings page for editing business name/address and the service catalogue; wired up the previously-unused sonner Toaster |
+| 28 | Playwright Test Suite | 2026-08-29 | `docs/reports/28-playwright-test-suite.md` | 10 tests, real AI + real DB, covering the pipeline golden path, both email-intake paths, settings, and nav — closes the zero-coverage gap open since report 02 |
+| 29 | Dashboard Banner Image Compression | 2026-08-29 | `docs/reports/29-banner-image-compression.md` | Compressed the banner 3.81MB → 0.52MB; declined to expand into an upload/preset feature without a real storage plan and real images |
 
 **Gap: reports 09 through 21 are not indexed here yet.** Substantial work landed
 in that range without going through this index/decision-log update step — quote
@@ -47,7 +51,7 @@ table as incomplete until that catch-up pass happens.
 Note: `02`, `05`, `06`, and `08` are each used twice or more in the existing
 history — that numbering drift predates this index and isn't being corrected
 retroactively (would misrepresent when things actually happened). New reports
-should number forward from `25`.
+should number forward from `29`.
 
 ## Decisions
 

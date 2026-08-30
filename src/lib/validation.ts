@@ -11,6 +11,8 @@ export const MAX_LENGTHS = {
   quoteNotes: 500,
   vehicleField: 60,
   vehicleYear: 4,
+  businessName: 100,
+  businessAddress: 300,
 } as const;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
