@@ -9,9 +9,11 @@ import { QuoteForm, type SuggestedLineItem } from "@/components/leads/quote-form
 import { SendQuoteCard } from "@/components/leads/send-quote-card";
 import { PendingReplyCard } from "@/components/leads/pending-reply-card";
 import { ClosingMessageCard } from "@/components/leads/closing-message-card";
+import { BookingMessageCard } from "@/components/leads/booking-message-card";
 import { formatQuoteNumber } from "@/lib/quote-number";
 import { NoteForm } from "@/components/leads/note-form";
 import { prisma } from "@/lib/db";
+import { requireEmployee } from "@/lib/auth/session";
 import {
   STAGE_LABELS,
   LEAD_SOURCE_LABELS,
@@ -28,6 +30,7 @@ export default async function LeadDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireEmployee();
   const { id } = await params;
 
   const lead = await prisma.lead.findUnique({
@@ -248,6 +251,10 @@ export default async function LeadDetailPage({
 
           {lead.pendingClosingMessage ? (
             <ClosingMessageCard leadId={lead.id} draft={lead.pendingClosingMessage} />
+          ) : null}
+
+          {lead.pendingBookingMessage ? (
+            <BookingMessageCard leadId={lead.id} draft={lead.pendingBookingMessage} />
           ) : null}
 
           {reportActivity ? (

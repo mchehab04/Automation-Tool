@@ -42,6 +42,12 @@ export function isValidPhone(raw: string): boolean {
   return digits.length >= 7 && digits.length <= 15;
 }
 
+export const MIN_PASSWORD_LENGTH = 8;
+
+export function isValidPassword(raw: string): boolean {
+  return raw.length >= MIN_PASSWORD_LENGTH;
+}
+
 // Common role-account local-parts that aren't a person's name — guessing a
 // name from these would be actively wrong, so leave the name blank instead.
 const GENERIC_EMAIL_LOCAL_PARTS = new Set([

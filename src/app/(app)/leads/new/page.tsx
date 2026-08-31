@@ -1,7 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { LeadForm } from "@/components/leads/lead-form";
+import { requireEmployee } from "@/lib/auth/session";
 
-export default function NewLeadPage() {
+export default async function NewLeadPage() {
+  await requireEmployee();
+
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6">
       <div>

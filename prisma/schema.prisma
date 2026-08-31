@@ -30,6 +30,40 @@ model Business {
 
   leads        Lead[]
   catalogItems ServiceCatalogItem[]
+  employees    Employee[]
+}
+
+// A staff member who can log in. Per-employee (not one shared login) so
+// actions stay attributable and revoking one person's access doesn't mean
+// rotating a password everyone shares. No roles/permissions yet — nothing
+// in the app branches on identity today, so a role field would be pure
+// speculation; add it if a real need shows up.
+model Employee {
+  id           String   @id @default(cuid())
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id])
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  sessions Session[]
+
+  @@index([businessId])
+}
+
+// Opaque session tokens — only a SHA-256 hash of the raw token is ever
+// stored here, so a DB leak alone can't be used to impersonate a live
+// session (the raw token only ever lives in the httpOnly cookie).
+model Session {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([employeeId])
 }
 
 // Priced parts/labor entries a business offers (e.g. "Oil change" — $65),
@@ -114,6 +148,11 @@ model Lead {
   // AI-drafted thank-you message awaiting staff review, populated when a
   // lead closes WON/LOST — cleared once sent via sendClosingMessage.
   pendingClosingMessage String?
+  // Deterministic booking-confirmation message, populated when the lead
+  // moves to SCHEDULED — cleared once sent via sendBookingMessage. Not
+  // AI-drafted (unlike the other pending* fields): the appointment time and
+  // vehicle are already fully known at that point, nothing to synthesize.
+  pendingBookingMessage String?
   // Booked appointment time, set when the lead moves to SCHEDULED.
   scheduledAt        DateTime?
   // Set when this lead was created because the same contact (by email/phone)
@@ -219,6 +258,9 @@ enum NotificationType {
   REPLY_SEND_PENDING
   // A thank-you message drafted for a just-closed lead is awaiting review.
   THANK_YOU_SEND_PENDING
+  // A booking-confirmation message is drafted and awaiting staff review,
+  // populated when a lead moves to SCHEDULED.
+  BOOKING_SEND_PENDING
 }
 
 // In-app "needs your attention" queue, shown via the header bell icon —

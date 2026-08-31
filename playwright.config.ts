@@ -5,6 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
 // service catalogue, scheduling slots) can't race each other.
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",
   fullyParallel: false,
   workers: 1,
@@ -14,6 +15,10 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3000",
     trace: "retain-on-failure",
+    // Logged in once by global-setup.ts (auth added — every route is now
+    // gated) and reused across every spec, rather than each spec logging in
+    // itself.
+    storageState: "e2e/.auth/session.json",
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },

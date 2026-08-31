@@ -59,6 +59,7 @@ export const REASON_CODES: Partial<Record<PipelineStage, ReasonCode[]>> = {
     { code: "competitor", label: "Chose a competitor" },
     { code: "parts_unavailable", label: "Needed parts weren't available in time" },
     { code: "timing", label: "Bad timing" },
+    { code: "no_show", label: "No show" },
     { code: "other", label: "Other" },
   ],
 };

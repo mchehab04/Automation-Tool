@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { prisma } from "@/lib/db";
+import { requireEmployee } from "@/lib/auth/session";
 import { stageBadgeVariant, stageBadgeClassName } from "@/lib/pipeline";
 import { BUSINESS_TIMEZONE, toUaeParts, fromUaeParts, type UaeDateParts } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,7 @@ export default async function CalendarPage({
 }: {
   searchParams: Promise<{ view?: string; month?: string; start?: string }>;
 }) {
+  await requireEmployee();
   const { view: viewRaw, month: monthParamRaw, start: startParamRaw } = await searchParams;
   const view = viewRaw === "week" ? "week" : "month";
 

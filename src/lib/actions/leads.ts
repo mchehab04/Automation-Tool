@@ -15,6 +15,7 @@ import {
   normalizePhone,
 } from "@/lib/validation";
 import type { VehicleDetails } from "@/lib/vehicle";
+import { defaultBookingMessage } from "@/lib/booking-message";
 import type { PipelineStage } from "@/generated/prisma/enums";
 import { BUSINESS_TIMEZONE, parseUaeDateTimeLocal } from "@/lib/timezone";
 
@@ -130,6 +131,19 @@ export async function updateLeadStage(
     }
   }
 
+  // Deterministic booking-confirmation draft — no AI call needed, everything
+  // it references (name, appointment time, vehicle) is already known here.
+  // Vehicle fields are guaranteed non-empty by this point: SCHEDULED is only
+  // reachable via QUALIFIED, which already requires them.
+  const bookingMessage =
+    nextStage === "SCHEDULED" && scheduledDate
+      ? defaultBookingMessage(lead.name, scheduledDate, {
+          make: lead.vehicleMake ?? "",
+          model: lead.vehicleModel ?? "",
+          year: lead.vehicleYear ?? "",
+        })
+      : null;
+
   // "Qualified" means the vehicle is identified, not just that contact info
   // exists — required, not optional. Falls back to whatever's already on the
   // lead (AI intake may have pre-filled it) so re-confirming an already-known
@@ -152,6 +166,7 @@ export async function updateLeadStage(
       data: {
         stage: nextStage,
         scheduledAt: scheduledDate ?? undefined,
+        pendingBookingMessage: bookingMessage ?? undefined,
         ...vehicleUpdate,
       },
     }),
@@ -169,6 +184,17 @@ export async function updateLeadStage(
             : null,
       },
     }),
+    ...(bookingMessage
+      ? [
+          prisma.notification.create({
+            data: {
+              leadId,
+              type: "BOOKING_SEND_PENDING",
+              message: `A booking confirmation for ${lead.name} is drafted and ready to review.`,
+            },
+          }),
+        ]
+      : []),
   ]);
 
   revalidatePath("/dashboard");

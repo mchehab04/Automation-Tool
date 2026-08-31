@@ -3,6 +3,7 @@ import { setDefaultResultOrder } from "node:dns";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { hashPassword } from "../src/lib/auth/password";
 
 // See src/lib/db.ts for why this is here.
 setDefaultResultOrder("ipv4first");
@@ -106,6 +107,21 @@ async function main() {
       });
     }
   }
+
+  // Bootstrap account so there's always a way to log in — dev-only default,
+  // documented as something to change before any real use. This project's
+  // single shared Neon DB means running this once locally also makes the
+  // account usable against the deployed app.
+  await prisma.employee.upsert({
+    where: { email: "owner@demobusiness.test" },
+    update: {},
+    create: {
+      businessId: business.id,
+      name: "Demo Owner",
+      email: "owner@demobusiness.test",
+      passwordHash: await hashPassword("changeme123"),
+    },
+  });
 
   console.log(
     `Seeded business "${business.name}" with ${DEMO_LEADS.length} leads and ${DEMO_CATALOG_ITEMS.length} catalog items.`,

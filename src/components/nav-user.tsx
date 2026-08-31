@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import {
 	Avatar,
 	AvatarFallback,
@@ -13,31 +14,28 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserIcon, BellIcon, HelpCircleIcon, LogOutIcon } from "lucide-react";
+import { UserIcon, BellIcon, HelpCircleIcon, LogOutIcon, Loader2 } from "lucide-react";
+import { logout } from "@/lib/actions/auth";
 
-// Single hardcoded demo business until auth/multi-tenancy is built.
-const user = {
-	name: "Demo Business",
-	email: "demo@pipelinehub.app",
-};
+export function NavUser({ employee }: { employee: { name: string; email: string } }) {
+	const [isPending, startTransition] = useTransition();
 
-export function NavUser() {
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger render={<Avatar className="size-8" />} nativeButton={false}>
-				<AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+				<AvatarFallback>{employee.name.charAt(0)}</AvatarFallback>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-60">
 				<DropdownMenuItem className="flex items-center justify-start gap-2">
 					<DropdownMenuLabel className="flex items-center gap-3">
 						<Avatar className="size-10">
-							<AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+							<AvatarFallback>{employee.name.charAt(0)}</AvatarFallback>
 						</Avatar>
 						<div>
-							<span className="font-medium text-foreground">{user.name}</span>{" "}
+							<span className="font-medium text-foreground">{employee.name}</span>{" "}
 							<br />
 							<div className="max-w-full overflow-hidden overflow-ellipsis whitespace-nowrap text-muted-foreground text-xs">
-								{user.email}
+								{employee.email}
 							</div>
 						</div>
 					</DropdownMenuLabel>
@@ -59,8 +57,13 @@ export function NavUser() {
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
 				<DropdownMenuGroup>
-					<DropdownMenuItem className="w-full cursor-pointer" variant="destructive">
-						<LogOutIcon />
+					<DropdownMenuItem
+						className="w-full cursor-pointer"
+						variant="destructive"
+						disabled={isPending}
+						onClick={() => startTransition(() => logout())}
+					>
+						{isPending ? <Loader2 className="animate-spin" /> : <LogOutIcon />}
 						Log out
 					</DropdownMenuItem>
 				</DropdownMenuGroup>

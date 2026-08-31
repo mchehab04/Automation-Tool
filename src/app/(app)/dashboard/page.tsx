@@ -6,6 +6,7 @@ import type { Stat } from "@/components/stats";
 import type { LeadsVolumeRow } from "@/components/leads-volume-chart";
 import type { SourceDatum } from "@/components/leads-by-source-chart";
 import { prisma } from "@/lib/db";
+import { requireEmployee } from "@/lib/auth/session";
 import { PIPELINE_STAGES, LEAD_SOURCE_LABELS } from "@/lib/pipeline";
 import type { PipelineStage } from "@/generated/prisma/enums";
 
@@ -108,6 +109,8 @@ async function getNewLeadsDelta(): Promise<{ thisWeek: number; deltaPct: number 
 }
 
 export default async function DashboardPage() {
+  await requireEmployee();
+
   const [stageCounts, leadsVolume, leadsBySource, recentLeads, newLeads] = await Promise.all([
     getStageCounts(),
     getLeadsVolume(),

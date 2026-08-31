@@ -1,16 +1,24 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { BusinessDetailsForm } from "@/components/settings/business-details-form";
 import { CatalogManager } from "@/components/settings/catalog-manager";
+import { EmployeeManager } from "@/components/settings/employee-manager";
 import { prisma } from "@/lib/db";
+import { requireEmployee } from "@/lib/auth/session";
 
 const DEMO_BUSINESS_ID = "demo-business";
 
 export default async function SettingsPage() {
-  const [business, catalogItems] = await Promise.all([
+  await requireEmployee();
+
+  const [business, catalogItems, employees] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id: DEMO_BUSINESS_ID } }),
     prisma.serviceCatalogItem.findMany({
       where: { businessId: DEMO_BUSINESS_ID },
       orderBy: { description: "asc" },
+    }),
+    prisma.employee.findMany({
+      where: { businessId: DEMO_BUSINESS_ID },
+      orderBy: { createdAt: "asc" },
     }),
   ]);
 
@@ -19,7 +27,7 @@ export default async function SettingsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Business details and the service price catalogue used to ground AI quote suggestions.
+          Business details, the service price catalogue used to ground AI quote suggestions, and staff accounts.
         </p>
       </div>
 
@@ -42,6 +50,23 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <CatalogManager items={catalogItems} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Employees</CardTitle>
+          <CardDescription>Staff accounts that can sign in to this app.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EmployeeManager
+            items={employees.map((e) => ({
+              id: e.id,
+              name: e.name,
+              email: e.email,
+              createdAt: e.createdAt.toISOString(),
+            }))}
+          />
         </CardContent>
       </Card>
     </div>

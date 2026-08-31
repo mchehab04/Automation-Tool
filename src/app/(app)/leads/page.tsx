@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { KanbanBoard } from "@/components/leads/kanban-board";
 import { GmailCheckButton } from "@/components/leads/gmail-check-button";
 import { prisma } from "@/lib/db";
+import { requireEmployee } from "@/lib/auth/session";
 
 // Live business data — always render per-request, never pre-render at build
 // time (which would both freeze a stale snapshot and require the build
@@ -12,6 +13,8 @@ export const dynamic = "force-dynamic";
 const DEMO_BUSINESS_ID = "demo-business";
 
 export default async function LeadsPage() {
+  await requireEmployee();
+
   const leads = await prisma.lead.findMany({
     where: { businessId: DEMO_BUSINESS_ID },
     orderBy: { createdAt: "desc" },

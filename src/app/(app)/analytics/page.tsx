@@ -1,6 +1,7 @@
 import { DashboardStats, type Stat } from "@/components/stats";
 import { ReasonBreakdownCard, type ReasonRow } from "@/components/reason-breakdown-card";
 import { prisma } from "@/lib/db";
+import { requireEmployee } from "@/lib/auth/session";
 import { PIPELINE_STAGES, REASON_CODES } from "@/lib/pipeline";
 import type { PipelineStage } from "@/generated/prisma/enums";
 
@@ -51,6 +52,8 @@ async function getReasonCounts(stage: "WON" | "LOST"): Promise<ReasonRow[]> {
 }
 
 export default async function AnalyticsPage() {
+  await requireEmployee();
+
   const [stageCounts, wonReasons, lostReasons] = await Promise.all([
     getStageCounts(),
     getReasonCounts("WON"),

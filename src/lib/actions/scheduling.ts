@@ -1,8 +1,10 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { SLOT_MINUTES, BUSINESS_HOURS, OPEN_WEEKDAYS, BOOKING_WINDOW_DAYS } from "@/lib/scheduling";
 import { BUSINESS_TIMEZONE, toUaeParts, fromUaeParts } from "@/lib/timezone";
+import { sendLeadEmail } from "@/lib/email/send";
 
 export type AvailableDay = {
   date: string; // "YYYY-MM-DD", for grouping
@@ -87,4 +89,41 @@ export async function getAvailableSlots(): Promise<AvailableDay[]> {
   }
 
   return days;
+}
+
+export async function sendBookingMessage(leadId: string, text: string) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new Error("Message can't be empty.");
+  }
+
+  const lead = await prisma.lead.findUniqueOrThrow({
+    where: { id: leadId },
+    include: { business: true },
+  });
+
+  if (!lead.email) {
+    throw new Error("This lead doesn't have an email address on file to send to.");
+  }
+
+  const { note } = await sendLeadEmail(leadId, {
+    to: lead.email,
+    fromName: lead.business.name,
+    subject: `Your appointment with ${lead.business.name} is confirmed`,
+    text: trimmed,
+    label: "Booking confirmation",
+  });
+
+  await prisma.$transaction([
+    prisma.lead.update({ where: { id: leadId }, data: { pendingBookingMessage: null } }),
+    prisma.activity.create({ data: { leadId, type: "NOTE", note } }),
+    prisma.message.create({ data: { leadId, role: "BUSINESS", text: trimmed } }),
+    prisma.notification.updateMany({
+      where: { leadId, type: "BOOKING_SEND_PENDING", read: false },
+      data: { read: true },
+    }),
+  ]);
+
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/", "layout");
 }

@@ -11,7 +11,7 @@ import { NavUser } from "@/components/nav-user";
 import { NotificationBell } from "@/components/notification-bell";
 import { SendIcon } from "lucide-react";
 
-export function AppHeader() {
+export function AppHeader({ employee }: { employee: { name: string; email: string } }) {
 	const pathname = usePathname();
 	const activeItem = navLinks.find((item) => item.path && pathname.startsWith(item.path));
 
@@ -39,7 +39,7 @@ export function AppHeader() {
 					className="h-4 data-[orientation=vertical]:self-center"
 					orientation="vertical"
 				/>
-				<NavUser />
+				<NavUser employee={employee} />
 			</div>
 		</header>
 	);

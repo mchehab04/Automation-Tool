@@ -1,7 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { EmailIntakeSimulator } from "@/components/leads/email-intake-simulator";
+import { requireEmployee } from "@/lib/auth/session";
 
-export default function SimulateEmailIntakePage() {
+export default async function SimulateEmailIntakePage() {
+  await requireEmployee();
+
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <div>
