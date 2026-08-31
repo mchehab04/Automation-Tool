@@ -8,7 +8,7 @@ import { requireEmployee } from "@/lib/auth/session";
 const DEMO_BUSINESS_ID = "demo-business";
 
 export default async function SettingsPage() {
-  await requireEmployee();
+  const currentEmployee = await requireEmployee();
 
   const [business, catalogItems, employees] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id: DEMO_BUSINESS_ID } }),
@@ -66,6 +66,7 @@ export default async function SettingsPage() {
               email: e.email,
               createdAt: e.createdAt.toISOString(),
             }))}
+            isOwner={currentEmployee.role === "OWNER"}
           />
         </CardContent>
       </Card>

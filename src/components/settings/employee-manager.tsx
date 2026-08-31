@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,38 +15,58 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { createEmployee, deleteEmployee } from "@/lib/actions/employees";
+import { createEmployee, updateEmployee, deleteEmployee } from "@/lib/actions/employees";
 import { MAX_LENGTHS, MIN_PASSWORD_LENGTH, isValidEmail } from "@/lib/validation";
 
 export type EmployeeRow = { id: string; name: string; email: string; createdAt: string };
 
-export function EmployeeManager({ items }: { items: EmployeeRow[] }) {
-  const [dialogOpen, setDialogOpen] = useState(false);
+export function EmployeeManager({ items, isOwner }: { items: EmployeeRow[]; isOwner: boolean }) {
+  // editingItem: null while dialog is closed. When open, undefined means
+  // "add new", an item means "edit that item" — mirrors catalog-manager.tsx
+  // / stage-select.tsx's pattern: fields are reset explicitly by whichever
+  // handler opens the dialog, not derived during render.
+  const [editingItem, setEditingItem] = useState<EmployeeRow | undefined | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const dialogOpen = editingItem !== null;
+  // Password is required to add, optional to edit (blank = keep current).
   const isValid =
-    name.trim().length > 0 && isValidEmail(email) && email.trim().length > 0 && password.length >= MIN_PASSWORD_LENGTH;
+    name.trim().length > 0 &&
+    isValidEmail(email) &&
+    email.trim().length > 0 &&
+    (editingItem ? password.length === 0 || password.length >= MIN_PASSWORD_LENGTH : password.length >= MIN_PASSWORD_LENGTH);
 
   const openAdd = () => {
     setName("");
     setEmail("");
     setPassword("");
-    setDialogOpen(true);
+    setEditingItem(undefined);
   };
-  const closeDialog = () => setDialogOpen(false);
+  const openEdit = (item: EmployeeRow) => {
+    setName(item.name);
+    setEmail(item.email);
+    setPassword("");
+    setEditingItem(item);
+  };
+  const closeDialog = () => setEditingItem(null);
 
   const handleSubmit = async (formData: FormData) => {
     setSaving(true);
     try {
-      await createEmployee(formData);
-      toast.success("Employee added.");
+      if (editingItem) {
+        await updateEmployee(editingItem.id, formData);
+        toast.success("Employee updated.");
+      } else {
+        await createEmployee(formData);
+        toast.success("Employee added.");
+      }
       closeDialog();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to add employee.");
+      toast.error(err instanceof Error ? err.message : "Failed to save.");
     } finally {
       setSaving(false);
     }
@@ -72,7 +92,7 @@ export function EmployeeManager({ items }: { items: EmployeeRow[] }) {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
-              <TableHead className="w-12" />
+              {isOwner ? <TableHead className="w-20" /> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -80,18 +100,31 @@ export function EmployeeManager({ items }: { items: EmployeeRow[] }) {
               <TableRow key={item.id}>
                 <TableCell>{item.name}</TableCell>
                 <TableCell className="text-muted-foreground">{item.email}</TableCell>
-                <TableCell>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Remove employee"
-                    disabled={deletingId === item.id}
-                    onClick={() => handleDelete(item.id)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </TableCell>
+                {isOwner ? (
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Edit employee"
+                        onClick={() => openEdit(item)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Remove employee"
+                        disabled={deletingId === item.id}
+                        onClick={() => handleDelete(item.id)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                ) : null}
               </TableRow>
             ))}
           </TableBody>
@@ -102,17 +135,21 @@ export function EmployeeManager({ items }: { items: EmployeeRow[] }) {
         </p>
       )}
 
-      <Button type="button" variant="outline" size="sm" className="self-start" onClick={openAdd}>
-        <Plus className="size-4" /> Add employee
-      </Button>
+      {isOwner ? (
+        <Button type="button" variant="outline" size="sm" className="self-start" onClick={openAdd}>
+          <Plus className="size-4" /> Add employee
+        </Button>
+      ) : null}
 
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent>
           <form action={handleSubmit} className="flex flex-col gap-4">
             <DialogHeader>
-              <DialogTitle>Add employee</DialogTitle>
+              <DialogTitle>{editingItem ? "Edit employee" : "Add employee"}</DialogTitle>
               <DialogDescription>
-                They&apos;ll use this email and password to sign in — share it with them directly.
+                {editingItem
+                  ? "Leave the password blank to keep their current one."
+                  : "They'll use this email and password to sign in — share it with them directly."}
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-1.5">
@@ -137,7 +174,9 @@ export function EmployeeManager({ items }: { items: EmployeeRow[] }) {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="employee-password">Temporary password</Label>
+              <Label htmlFor="employee-password">
+                {editingItem ? "New password" : "Temporary password"}
+              </Label>
               <Input
                 id="employee-password"
                 name="password"
@@ -145,15 +184,20 @@ export function EmployeeManager({ items }: { items: EmployeeRow[] }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
+                placeholder={editingItem ? "Leave blank to keep current" : undefined}
               />
-              <p className="text-xs text-muted-foreground">At least {MIN_PASSWORD_LENGTH} characters.</p>
+              <p className="text-xs text-muted-foreground">
+                {editingItem
+                  ? `Leave blank to keep their current password, or set a new one (at least ${MIN_PASSWORD_LENGTH} characters) — this signs them out everywhere.`
+                  : `At least ${MIN_PASSWORD_LENGTH} characters.`}
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>
                 Cancel
               </Button>
               <Button type="submit" disabled={!isValid || saving}>
-                {saving ? "Adding…" : "Add employee"}
+                {saving ? "Saving…" : editingItem ? "Save" : "Add employee"}
               </Button>
             </DialogFooter>
           </form>

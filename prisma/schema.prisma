@@ -38,14 +38,24 @@ model Business {
 // rotating a password everyone shares. No roles/permissions yet — nothing
 // in the app branches on identity today, so a role field would be pure
 // speculation; add it if a real need shows up.
+enum EmployeeRole {
+  OWNER
+  STAFF
+}
+
 model Employee {
-  id           String   @id @default(cuid())
+  id           String       @id @default(cuid())
   businessId   String
-  business     Business @relation(fields: [businessId], references: [id])
+  business     Business     @relation(fields: [businessId], references: [id])
   name         String
-  email        String   @unique
+  email        String       @unique
   passwordHash String
-  createdAt    DateTime @default(now())
+  // Only OWNER can add/edit/remove other employees — enforced in
+  // src/lib/actions/employees.ts via requireOwner(), not just hidden in
+  // the UI. A single owner is the model this was built for; no
+  // ownership-transfer flow.
+  role         EmployeeRole @default(STAFF)
+  createdAt    DateTime     @default(now())
 
   sessions Session[]
 

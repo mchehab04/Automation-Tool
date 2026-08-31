@@ -26,7 +26,7 @@ export function NavUser({ employee }: { employee: { name: string; email: string 
 				<AvatarFallback>{employee.name.charAt(0)}</AvatarFallback>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-60">
-				<DropdownMenuItem className="flex items-center justify-start gap-2">
+				<DropdownMenuGroup>
 					<DropdownMenuLabel className="flex items-center gap-3">
 						<Avatar className="size-10">
 							<AvatarFallback>{employee.name.charAt(0)}</AvatarFallback>
@@ -39,7 +39,7 @@ export function NavUser({ employee }: { employee: { name: string; email: string 
 							</div>
 						</div>
 					</DropdownMenuLabel>
-				</DropdownMenuItem>
+				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
 				<DropdownMenuGroup>
 					<DropdownMenuItem>

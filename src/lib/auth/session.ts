@@ -70,3 +70,13 @@ export async function requireEmployee() {
   if (!employee) redirect("/login");
   return employee;
 }
+
+// For use inside server actions (throws, caught by the existing toast
+// pattern) rather than page-level redirect — there's no owner-only page
+// today, just owner-only actions within /settings.
+export async function requireOwner() {
+  const employee = await getCurrentEmployee();
+  if (!employee) throw new Error("You must be signed in.");
+  if (employee.role !== "OWNER") throw new Error("Only the owner can do this.");
+  return employee;
+}

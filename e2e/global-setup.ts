@@ -16,9 +16,12 @@ export default async function globalSetup(config: FullConfig) {
   const page = await browser.newPage();
 
   await page.goto(`${baseURL}/login`);
+  // getByLabel("Password") would also match the show/hide toggle button
+  // (aria-label="Show password") since it matches as a substring — target
+  // the textbox role specifically instead.
   await page.getByLabel("Email").fill(SEED_EMAIL);
-  await page.getByLabel("Password").fill(SEED_PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("textbox", { name: "Password" }).fill(SEED_PASSWORD);
+  await page.getByRole("button", { name: "Sign In" }).click();
   await page.waitForURL(`${baseURL}/dashboard`);
 
   await page.context().storageState({ path: STORAGE_STATE_PATH });

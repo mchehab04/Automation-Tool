@@ -114,12 +114,15 @@ async function main() {
   // account usable against the deployed app.
   await prisma.employee.upsert({
     where: { email: "owner@demobusiness.test" },
-    update: {},
+    // Retroactively promotes this row if it already existed from before
+    // the EmployeeRole migration (which defaults new rows to STAFF).
+    update: { role: "OWNER" },
     create: {
       businessId: business.id,
       name: "Demo Owner",
       email: "owner@demobusiness.test",
       passwordHash: await hashPassword("changeme123"),
+      role: "OWNER",
     },
   });
 
