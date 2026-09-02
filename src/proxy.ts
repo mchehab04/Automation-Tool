@@ -43,6 +43,9 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // /api/cron/* (the Gmail-intake cron) authenticates via a CRON_SECRET
   // bearer header, not a session cookie — excluded so Vercel's scheduler
-  // isn't redirected to /login.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/cron).*)"],
+  // isn't redirected to /login. /api/webhooks/* (WhatsApp) is called by
+  // Meta's servers and authenticates via its own signature check — same
+  // reasoning, a redirect here would break both Meta's verification
+  // handshake and every inbound message delivery.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/cron|api/webhooks).*)"],
 };

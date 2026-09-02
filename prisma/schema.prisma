@@ -177,6 +177,7 @@ model Lead {
 
   activities    Activity[]
   quotes        Quote[]
+  invoices      Invoice[]
   messages      Message[]
   notifications Notification[]
 
@@ -189,6 +190,7 @@ enum ActivityType {
   NOTE
   STAGE_CHANGE
   QUOTE_GENERATED
+  INVOICE_GENERATED
   REPORT
 }
 
@@ -255,6 +257,31 @@ model Quote {
   @@index([leadId])
 }
 
+// Bill for completed work, generated once a lead is Won — mirrors Quote's
+// shape deliberately (own number sequence, lineItems, PDF, send flow), but
+// kept as its own model rather than a flag on Quote: an invoice starts as
+// a copy of the quote's line items but is expected to diverge (extra work
+// found on the job), and its lifecycle (paid/unpaid) has nothing to do
+// with a quote's.
+model Invoice {
+  id          String    @id @default(cuid())
+  number      Int?      @unique
+  leadId      String
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lineItems   String    // JSON-encoded array of { description, quantity, unitPrice }
+  notes       String?
+  // Pre-VAT subtotal, cents — same convention as Quote.totalAmount.
+  totalAmount Int
+  currency    String    @default("USD")
+  generatedAt DateTime  @default(now())
+  sentAt      DateTime?
+  // Manual, staff-set — no online payment collection (a separate, later
+  // feature). null = unpaid.
+  paidAt      DateTime?
+
+  @@index([leadId])
+}
+
 enum NotificationType {
   // A brand-new lead was created from an inbound message (simulated or real).
   NEW_LEAD
@@ -271,6 +298,8 @@ enum NotificationType {
   // A booking-confirmation message is drafted and awaiting staff review,
   // populated when a lead moves to SCHEDULED.
   BOOKING_SEND_PENDING
+  // An invoice was generated and is ready to be emailed to the customer.
+  INVOICE_SEND_PENDING
 }
 
 // In-app "needs your attention" queue, shown via the header bell icon —
@@ -283,6 +312,8 @@ model Notification {
   // Set only for QUOTE_SEND_PENDING, so approving one quote resolves
   // precisely that notification rather than every pending one on the lead.
   quoteId   String?
+  // Same idea as quoteId, for INVOICE_SEND_PENDING.
+  invoiceId String?
   type      NotificationType
   message   String
   read      Boolean          @default(false)

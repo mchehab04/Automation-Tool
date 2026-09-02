@@ -7,10 +7,13 @@ import { Button } from "@/components/ui/button";
 import { StageSelect } from "@/components/leads/stage-select";
 import { QuoteForm, type SuggestedLineItem } from "@/components/leads/quote-form";
 import { SendQuoteCard } from "@/components/leads/send-quote-card";
+import { InvoiceForm } from "@/components/leads/invoice-form";
+import { SendInvoiceCard } from "@/components/leads/send-invoice-card";
+import { InvoicePaidToggle } from "@/components/leads/invoice-paid-toggle";
 import { PendingReplyCard } from "@/components/leads/pending-reply-card";
 import { ClosingMessageCard } from "@/components/leads/closing-message-card";
 import { BookingMessageCard } from "@/components/leads/booking-message-card";
-import { formatQuoteNumber } from "@/lib/quote-number";
+import { formatQuoteNumber, formatInvoiceNumber } from "@/lib/quote-number";
 import { NoteForm } from "@/components/leads/note-form";
 import { prisma } from "@/lib/db";
 import { requireEmployee } from "@/lib/auth/session";
@@ -23,6 +26,7 @@ import {
 } from "@/lib/pipeline";
 import { BUSINESS_TIMEZONE } from "@/lib/timezone";
 import { defaultQuoteMessage } from "@/lib/quote-message";
+import { defaultInvoiceMessage } from "@/lib/invoice-message";
 import { formatVehicle } from "@/lib/vehicle";
 
 export default async function LeadDetailPage({
@@ -38,6 +42,7 @@ export default async function LeadDetailPage({
     include: {
       activities: { orderBy: { createdAt: "desc" } },
       quotes: { orderBy: { generatedAt: "desc" } },
+      invoices: { orderBy: { generatedAt: "desc" } },
       messages: { orderBy: { createdAt: "asc" } },
       previousLead: { select: { id: true, name: true, stage: true } },
       followUpLeads: { select: { id: true, name: true, stage: true }, orderBy: { createdAt: "desc" } },
@@ -50,6 +55,24 @@ export default async function LeadDetailPage({
   // mere presence means "pending draft" — no need to also check quote count.
   const suggestedLineItems: SuggestedLineItem[] = lead.suggestedLineItems
     ? (JSON.parse(lead.suggestedLineItems) as SuggestedLineItem[])
+    : [];
+
+  // Seed a new invoice from the most recent existing invoice if there is
+  // one (so a correction builds on the last real invoice), otherwise the
+  // most recent quote (both already ordered newest-first), otherwise blank.
+  const invoiceSeedSource = lead.invoices[0] ?? lead.quotes[0];
+  const seedInvoiceLineItems: SuggestedLineItem[] = invoiceSeedSource
+    ? (
+        JSON.parse(invoiceSeedSource.lineItems) as {
+          description: string;
+          quantity: number;
+          unitPrice: number;
+        }[]
+      ).map((item) => ({
+        description: item.description,
+        quantity: String(item.quantity),
+        unitPrice: String(item.unitPrice / 100),
+      }))
     : [];
 
   const reportActivity = lead.activities.find((a) => a.type === "REPORT");
@@ -214,6 +237,67 @@ export default async function LeadDetailPage({
               <QuoteForm leadId={lead.id} suggestedLineItems={suggestedLineItems} />
             </CardContent>
           </Card>
+
+          {lead.stage === "WON" ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Invoice</CardTitle>
+                <CardDescription>Bill for completed work — may differ from the original quote.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {lead.invoices.length > 0 && (
+                  <ul className="flex flex-col gap-2">
+                    {lead.invoices.map((invoice) => (
+                      <li key={invoice.id} className="flex flex-col gap-2 border-b pb-2 text-sm last:border-b-0 last:pb-0">
+                        <div className="flex items-center justify-between">
+                          <span>
+                            <span className="text-muted-foreground">
+                              #{formatInvoiceNumber(invoice.number ?? 0)}
+                            </span>{" "}
+                            {(invoice.totalAmount / 100).toLocaleString("en-US", {
+                              style: "currency",
+                              currency: invoice.currency,
+                            })}{" "}
+                            <span className="text-muted-foreground">
+                              — {invoice.generatedAt.toLocaleDateString("en-US")}
+                            </span>
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant={invoice.paidAt ? "secondary" : "outline"}
+                              className={invoice.paidAt ? "bg-status-good/10 text-status-good" : undefined}
+                            >
+                              {invoice.paidAt ? "Paid" : "Unpaid"}
+                            </Badge>
+                            <Button
+                              render={<a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer" />}
+                              nativeButton={false}
+                              variant="outline"
+                              size="sm"
+                            >
+                              <FileText className="size-4" /> PDF
+                            </Button>
+                          </div>
+                        </div>
+                        <InvoicePaidToggle invoiceId={invoice.id} paid={Boolean(invoice.paidAt)} />
+                        {invoice.sentAt ? (
+                          <p className="text-xs text-muted-foreground">
+                            Sent to customer {invoice.sentAt.toLocaleString("en-US")}
+                          </p>
+                        ) : (
+                          <SendInvoiceCard
+                            invoiceId={invoice.id}
+                            initialMessage={defaultInvoiceMessage(lead.name)}
+                          />
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <InvoiceForm leadId={lead.id} seedLineItems={seedInvoiceLineItems} />
+              </CardContent>
+            </Card>
+          ) : null}
 
           {lead.messages.length > 0 ? (
             <Card>

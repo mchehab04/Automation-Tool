@@ -1,8 +1,0 @@
-apify-client
-python-dotenv
-gspread
-google-auth
-google-auth-oauthlib
-pandas
-anthropic
-requests
