@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { STAGE_LABELS, getReasonLabel } from "@/lib/pipeline";
 import { BUSINESS_TIMEZONE } from "@/lib/timezone";
 import { sendLeadEmail } from "@/lib/email/send";
+import { sendLeadWhatsApp } from "@/lib/whatsapp/send";
+import { originChannel } from "@/lib/lead-channel";
 
 const MODEL = "claude-sonnet-5";
 const MAX_REPORT_LENGTH = 2000;
@@ -153,13 +155,15 @@ export async function sendClosingMessage(leadId: string, text: string): Promise<
     include: { business: true },
   });
 
-  if (!lead.email) {
-    return { error: "This lead doesn't have an email address on file to send to." };
+  const channel = originChannel(lead);
+  if (!channel) {
+    return { error: "This lead has no contact info on file to send to." };
   }
 
   // WON gets a confirming subject, LOST a softer one — decided by the
   // lead's current stage, which is already WON/LOST by the time staff can
-  // send this.
+  // send this. WhatsApp messages have no subject line, so this only
+  // matters on the email branch.
   const subject =
     lead.stage === "WON"
       ? `Thank you for choosing ${lead.business.name}`
@@ -167,13 +171,16 @@ export async function sendClosingMessage(leadId: string, text: string): Promise<
 
   let note: string;
   try {
-    ({ note } = await sendLeadEmail(leadId, {
-      to: lead.email,
-      fromName: lead.business.name,
-      subject,
-      text: trimmed,
-      label: "Thank-you message",
-    }));
+    ({ note } =
+      channel === "whatsapp"
+        ? await sendLeadWhatsApp(leadId, { to: lead.phone!, text: trimmed, label: "Thank-you message" })
+        : await sendLeadEmail(leadId, {
+            to: lead.email!,
+            fromName: lead.business.name,
+            subject,
+            text: trimmed,
+            label: "Thank-you message",
+          }));
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to send the thank-you message." };
   }

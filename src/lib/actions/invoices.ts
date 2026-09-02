@@ -7,7 +7,8 @@ import { MAX_LENGTHS, parseForgivingNumber } from "@/lib/validation";
 import type { InvoiceLineItem } from "@/lib/pdf/invoice-document";
 import { formatInvoiceNumber } from "@/lib/quote-number";
 import { renderInvoicePdf } from "@/lib/pdf/render-invoice";
-import { sendLeadEmail } from "@/lib/email/send";
+import { sendDocumentToAllChannels } from "@/lib/send-document";
+import { availableChannels } from "@/lib/lead-channel";
 
 export async function createInvoice(leadId: string, formData: FormData) {
   const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId } });
@@ -96,26 +97,24 @@ export async function sendInvoiceToCustomer(invoiceId: string, message: string):
     include: { lead: { include: { business: true } } },
   });
 
-  if (!invoice.lead.email) {
-    return { error: "This lead doesn't have an email address on file to send the invoice to." };
+  if (availableChannels(invoice.lead).length === 0) {
+    return { error: "This lead has no contact info on file to send the invoice to." };
   }
 
   const number = formatInvoiceNumber(invoice.number ?? 0);
   const { buffer, filename } = await renderInvoicePdf(invoiceId);
 
-  let note: string;
-  try {
-    ({ note } = await sendLeadEmail(invoice.leadId, {
-      to: invoice.lead.email,
-      fromName: invoice.lead.business.name,
-      subject: `Your invoice from ${invoice.lead.business.name} — #${number}`,
-      text: trimmed,
-      attachment: { filename, content: buffer, contentType: "application/pdf" },
-      label: `Invoice #${number}`,
-    }));
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to send the invoice." };
+  const sendResult = await sendDocumentToAllChannels(invoice.leadId, {
+    lead: invoice.lead,
+    subjectEmail: `Your invoice from ${invoice.lead.business.name} — #${number}`,
+    text: trimmed,
+    attachment: { filename, content: buffer, contentType: "application/pdf" },
+    label: `Invoice #${number}`,
+  });
+  if ("error" in sendResult) {
+    return { error: sendResult.error };
   }
+  const { note } = sendResult;
 
   await prisma.$transaction([
     prisma.invoice.update({ where: { id: invoice.id }, data: { sentAt: new Date() } }),

@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { SLOT_MINUTES, BUSINESS_HOURS, OPEN_WEEKDAYS, BOOKING_WINDOW_DAYS } from "@/lib/scheduling";
 import { BUSINESS_TIMEZONE, toUaeParts, fromUaeParts } from "@/lib/timezone";
 import { sendLeadEmail } from "@/lib/email/send";
+import { sendLeadWhatsApp } from "@/lib/whatsapp/send";
+import { originChannel } from "@/lib/lead-channel";
 
 export type AvailableDay = {
   date: string; // "YYYY-MM-DD", for grouping
@@ -105,19 +107,23 @@ export async function sendBookingMessage(leadId: string, text: string): Promise<
     include: { business: true },
   });
 
-  if (!lead.email) {
-    return { error: "This lead doesn't have an email address on file to send to." };
+  const channel = originChannel(lead);
+  if (!channel) {
+    return { error: "This lead has no contact info on file to send to." };
   }
 
   let note: string;
   try {
-    ({ note } = await sendLeadEmail(leadId, {
-      to: lead.email,
-      fromName: lead.business.name,
-      subject: `Your appointment with ${lead.business.name} is confirmed`,
-      text: trimmed,
-      label: "Booking confirmation",
-    }));
+    ({ note } =
+      channel === "whatsapp"
+        ? await sendLeadWhatsApp(leadId, { to: lead.phone!, text: trimmed, label: "Booking confirmation" })
+        : await sendLeadEmail(leadId, {
+            to: lead.email!,
+            fromName: lead.business.name,
+            subject: `Your appointment with ${lead.business.name} is confirmed`,
+            text: trimmed,
+            label: "Booking confirmation",
+          }));
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to send the booking confirmation." };
   }

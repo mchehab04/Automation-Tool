@@ -7,7 +7,8 @@ import { MAX_LENGTHS, parseForgivingNumber } from "@/lib/validation";
 import type { QuoteLineItem } from "@/lib/pdf/quote-document";
 import { formatQuoteNumber } from "@/lib/quote-number";
 import { renderQuotePdf } from "@/lib/pdf/render-quote";
-import { sendLeadEmail } from "@/lib/email/send";
+import { sendDocumentToAllChannels } from "@/lib/send-document";
+import { availableChannels } from "@/lib/lead-channel";
 
 export async function createQuote(leadId: string, formData: FormData) {
   const descriptions = formData.getAll("description").map(String);
@@ -94,26 +95,24 @@ export async function sendQuoteToCustomer(quoteId: string, message: string): Pro
     include: { lead: { include: { business: true } } },
   });
 
-  if (!quote.lead.email) {
-    return { error: "This lead doesn't have an email address on file to send the quote to." };
+  if (availableChannels(quote.lead).length === 0) {
+    return { error: "This lead has no contact info on file to send the quote to." };
   }
 
   const number = formatQuoteNumber(quote.number ?? 0);
   const { buffer, filename } = await renderQuotePdf(quoteId);
 
-  let note: string;
-  try {
-    ({ note } = await sendLeadEmail(quote.leadId, {
-      to: quote.lead.email,
-      fromName: quote.lead.business.name,
-      subject: `Your quote from ${quote.lead.business.name} — #${number}`,
-      text: trimmed,
-      attachment: { filename, content: buffer, contentType: "application/pdf" },
-      label: `Quote #${number}`,
-    }));
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to send the quote." };
+  const sendResult = await sendDocumentToAllChannels(quote.leadId, {
+    lead: quote.lead,
+    subjectEmail: `Your quote from ${quote.lead.business.name} — #${number}`,
+    text: trimmed,
+    attachment: { filename, content: buffer, contentType: "application/pdf" },
+    label: `Quote #${number}`,
+  });
+  if ("error" in sendResult) {
+    return { error: sendResult.error };
   }
+  const { note } = sendResult;
 
   // A sent quote is the real-world event the "Quote Sent" stage represents —
   // fast-forward it automatically rather than making staff remember to also
