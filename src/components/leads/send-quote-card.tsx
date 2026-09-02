@@ -17,11 +17,8 @@ export function SendQuoteCard({ quoteId, initialMessage }: { quoteId: string; in
   const send = () => {
     setError(null);
     startTransition(async () => {
-      try {
-        await sendQuoteToCustomer(quoteId, text);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to send the quote.");
-      }
+      const result = await sendQuoteToCustomer(quoteId, text);
+      if (result?.error) setError(result.error);
     });
   };
 

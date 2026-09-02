@@ -35,19 +35,7 @@ export async function POST(request: Request) {
 
   // Meta signs the raw bytes, so verify before JSON.parse-ing.
   const rawBody = await request.text();
-  const receivedSig = request.headers.get("x-hub-signature-256");
-  const validSig = isValidSignature(rawBody, receivedSig, appSecret);
-  // TEMP diagnostic — remove once the signature mismatch is found. No
-  // secret value or HMAC output logged — a computed HMAC over
-  // attacker-influenced input (the request body) shouldn't be logged even
-  // though it doesn't reveal the key, since it's a valid forged signature
-  // for that exact payload if these logs are ever exposed.
-  console.log("WhatsApp webhook debug:", {
-    rawBodyLength: rawBody.length,
-    receivedSig, // Meta's own header value — not derived from our secret, safe to log
-    validSig,
-  });
-  if (!validSig) {
+  if (!isValidSignature(rawBody, request.headers.get("x-hub-signature-256"), appSecret)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 

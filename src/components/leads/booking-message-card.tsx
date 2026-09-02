@@ -15,11 +15,8 @@ export function BookingMessageCard({ leadId, draft }: { leadId: string; draft: s
   const send = () => {
     setError(null);
     startTransition(async () => {
-      try {
-        await sendBookingMessage(leadId, text);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to send the booking confirmation.");
-      }
+      const result = await sendBookingMessage(leadId, text);
+      if (result?.error) setError(result.error);
     });
   };
 

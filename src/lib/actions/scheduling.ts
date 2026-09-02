@@ -91,10 +91,13 @@ export async function getAvailableSlots(): Promise<AvailableDay[]> {
   return days;
 }
 
-export async function sendBookingMessage(leadId: string, text: string) {
+// Returns { error } for expected failures instead of throwing — see
+// reply.ts's sendPendingReply for why (Next.js redacts thrown Server Action
+// error messages in production).
+export async function sendBookingMessage(leadId: string, text: string): Promise<{ error: string } | undefined> {
   const trimmed = text.trim();
   if (!trimmed) {
-    throw new Error("Message can't be empty.");
+    return { error: "Message can't be empty." };
   }
 
   const lead = await prisma.lead.findUniqueOrThrow({
@@ -103,16 +106,21 @@ export async function sendBookingMessage(leadId: string, text: string) {
   });
 
   if (!lead.email) {
-    throw new Error("This lead doesn't have an email address on file to send to.");
+    return { error: "This lead doesn't have an email address on file to send to." };
   }
 
-  const { note } = await sendLeadEmail(leadId, {
-    to: lead.email,
-    fromName: lead.business.name,
-    subject: `Your appointment with ${lead.business.name} is confirmed`,
-    text: trimmed,
-    label: "Booking confirmation",
-  });
+  let note: string;
+  try {
+    ({ note } = await sendLeadEmail(leadId, {
+      to: lead.email,
+      fromName: lead.business.name,
+      subject: `Your appointment with ${lead.business.name} is confirmed`,
+      text: trimmed,
+      label: "Booking confirmation",
+    }));
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to send the booking confirmation." };
+  }
 
   await prisma.$transaction([
     prisma.lead.update({ where: { id: leadId }, data: { pendingBookingMessage: null } }),

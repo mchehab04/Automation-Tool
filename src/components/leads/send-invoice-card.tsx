@@ -16,11 +16,8 @@ export function SendInvoiceCard({ invoiceId, initialMessage }: { invoiceId: stri
   const send = () => {
     setError(null);
     startTransition(async () => {
-      try {
-        await sendInvoiceToCustomer(invoiceId, text);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to send the invoice.");
-      }
+      const result = await sendInvoiceToCustomer(invoiceId, text);
+      if (result?.error) setError(result.error);
     });
   };
 

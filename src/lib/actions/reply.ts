@@ -4,10 +4,16 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { sendLeadEmail } from "@/lib/email/send";
 
-export async function sendPendingReply(leadId: string, text: string) {
+// Returns { error } for expected failures instead of throwing — Next.js
+// redacts thrown Server Action error messages in production ("Minified
+// React error #441"), so a business-rule failure like "no email on file"
+// must be modeled as a return value, not a throw, to actually reach the
+// user. See node_modules/next/dist/docs/01-app/01-getting-started/
+// 10-error-handling.md.
+export async function sendPendingReply(leadId: string, text: string): Promise<{ error: string } | undefined> {
   const trimmed = text.trim();
   if (!trimmed) {
-    throw new Error("Reply can't be empty.");
+    return { error: "Reply can't be empty." };
   }
 
   const lead = await prisma.lead.findUniqueOrThrow({
@@ -16,16 +22,21 @@ export async function sendPendingReply(leadId: string, text: string) {
   });
 
   if (!lead.email) {
-    throw new Error("This lead doesn't have an email address on file to reply to.");
+    return { error: "This lead doesn't have an email address on file to reply to." };
   }
 
-  const { note } = await sendLeadEmail(leadId, {
-    to: lead.email,
-    fromName: lead.business.name,
-    subject: `Re: your enquiry`,
-    text: trimmed,
-    label: "Reply",
-  });
+  let note: string;
+  try {
+    ({ note } = await sendLeadEmail(leadId, {
+      to: lead.email,
+      fromName: lead.business.name,
+      subject: `Re: your enquiry`,
+      text: trimmed,
+      label: "Reply",
+    }));
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to send the reply." };
+  }
 
   await prisma.$transaction([
     prisma.lead.update({ where: { id: leadId }, data: { pendingReplyText: null } }),

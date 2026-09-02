@@ -15,11 +15,8 @@ export function ClosingMessageCard({ leadId, draft }: { leadId: string; draft: s
   const send = () => {
     setError(null);
     startTransition(async () => {
-      try {
-        await sendClosingMessage(leadId, text);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to send the thank-you message.");
-      }
+      const result = await sendClosingMessage(leadId, text);
+      if (result?.error) setError(result.error);
     });
   };
 

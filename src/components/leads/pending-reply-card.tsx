@@ -15,11 +15,8 @@ export function PendingReplyCard({ leadId, draft }: { leadId: string; draft: str
   const send = () => {
     setError(null);
     startTransition(async () => {
-      try {
-        await sendPendingReply(leadId, text);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to send the reply.");
-      }
+      const result = await sendPendingReply(leadId, text);
+      if (result?.error) setError(result.error);
     });
   };
 

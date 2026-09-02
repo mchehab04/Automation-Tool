@@ -84,20 +84,42 @@ re-running it alone, which passed).
 - `src/proxy.ts` — matcher excludes `api/webhooks` alongside the existing
   `api/cron` carve-out
 
-## Next step (yours, not code)
+## Live verification (post-deploy)
 
-1. Get `WHATSAPP_APP_SECRET` from Meta's App Settings → Basic → App
-   Secret ("Show", re-enter your password).
-2. Add all four WhatsApp env vars to Vercel's project settings (same
-   values as your local `.env`, once the App Secret is filled in) and
-   deploy.
-3. In Meta's app dashboard → WhatsApp → Configuration, set the Webhook
-   callback URL to `https://<your-vercel-domain>/api/webhooks/whatsapp`
-   and the Verify Token to the same `WHATSAPP_WEBHOOK_VERIFY_TOKEN` value,
-   then subscribe to the `messages` field.
-4. Send a real WhatsApp message to your test number and confirm a lead
-   shows up in the app.
+The user deployed and configured the webhook in Meta's dashboard; two real
+issues surfaced and got fixed, neither in code:
 
-Once that's confirmed working live, outbound sending (a
-`sendWhatsAppMessage` helper, a WhatsApp-flavored reply/quote send UI) is
-the natural next piece — not started here.
+1. **Wrong URL initially** — the first callback URL tried was a Vercel
+   *preview* deployment URL (has a random hash in it), which Vercel's own
+   Deployment Protection (SSO) gates behind a login redirect before any
+   request reaches app code. Fix: use the stable production domain
+   (Vercel → Domains tab) instead.
+2. **App Secret mismatch, then a real Meta-side gap** — after fixing the
+   URL, verification succeeded but every real POST came back `401 Invalid
+   signature`. Confirmed via Vercel's logs (`User-Agent: facebookexternalua`
+   on the failing requests — genuinely Meta, not a local test) that Meta
+   *was* delivering, just with a signature our secret didn't match.
+   Re-copying/resetting the App Secret in Meta and updating Vercel fixed
+   verification (confirmed via a temporary, minimal diagnostic log — no
+   secret or HMAC output logged, just body length, Meta's own signature
+   header, and a match boolean; removed once the fix was confirmed).
+   After that, Meta's own **Test** button worked (200, real AI call ran)
+   but real customer-sent messages still weren't arriving at all. Root
+   cause: subscribing to the `messages` field in the **App's** webhook
+   config only sets up the app's side — the **WhatsApp Business Account**
+   must separately be told to forward its events to that app, via
+   `POST /{waba-id}/subscribed_apps` with the access token. This isn't
+   exposed as a button in the current dashboard flow, only reachable via
+   that direct Graph API call. Once run, a real WhatsApp message correctly
+   created a lead: right name, phone normalized, vehicle extracted, and a
+   genuinely relevant AI-drafted clarifying question
+   (`pendingReplyText`) — the full pipeline confirmed working end-to-end
+   against Meta's real infrastructure, not just simulated payloads.
+
+`src/app/api/webhooks/whatsapp/route.ts` is back to its original form (the
+temporary diagnostic logging was removed after the fix was confirmed).
+
+## Next step
+
+Outbound sending (a `sendWhatsAppMessage` helper, a WhatsApp-flavored
+reply/quote send UI) is the natural next piece — not started here.

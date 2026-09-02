@@ -139,10 +139,13 @@ export async function generateClosingReport(
 
 // Sends the AI-drafted (or staff-edited) thank-you message for a just-closed
 // lead. Same review-before-send pattern as sendPendingReply/sendQuoteToCustomer.
-export async function sendClosingMessage(leadId: string, text: string) {
+// Returns { error } for expected failures instead of throwing — see
+// reply.ts's sendPendingReply for why (Next.js redacts thrown Server Action
+// error messages in production).
+export async function sendClosingMessage(leadId: string, text: string): Promise<{ error: string } | undefined> {
   const trimmed = text.trim();
   if (!trimmed) {
-    throw new Error("Message can't be empty.");
+    return { error: "Message can't be empty." };
   }
 
   const lead = await prisma.lead.findUniqueOrThrow({
@@ -151,7 +154,7 @@ export async function sendClosingMessage(leadId: string, text: string) {
   });
 
   if (!lead.email) {
-    throw new Error("This lead doesn't have an email address on file to send to.");
+    return { error: "This lead doesn't have an email address on file to send to." };
   }
 
   // WON gets a confirming subject, LOST a softer one — decided by the
@@ -162,13 +165,18 @@ export async function sendClosingMessage(leadId: string, text: string) {
       ? `Thank you for choosing ${lead.business.name}`
       : `Thank you from ${lead.business.name}`;
 
-  const { note } = await sendLeadEmail(leadId, {
-    to: lead.email,
-    fromName: lead.business.name,
-    subject,
-    text: trimmed,
-    label: "Thank-you message",
-  });
+  let note: string;
+  try {
+    ({ note } = await sendLeadEmail(leadId, {
+      to: lead.email,
+      fromName: lead.business.name,
+      subject,
+      text: trimmed,
+      label: "Thank-you message",
+    }));
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to send the thank-you message." };
+  }
 
   await prisma.$transaction([
     prisma.lead.update({ where: { id: leadId }, data: { pendingClosingMessage: null } }),

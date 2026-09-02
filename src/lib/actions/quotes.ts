@@ -80,10 +80,13 @@ export async function createQuote(leadId: string, formData: FormData) {
   redirect(`/leads/${leadId}?quote=${quote.id}`);
 }
 
-export async function sendQuoteToCustomer(quoteId: string, message: string) {
+// Returns { error } for expected failures instead of throwing — see
+// reply.ts's sendPendingReply for why (Next.js redacts thrown Server Action
+// error messages in production).
+export async function sendQuoteToCustomer(quoteId: string, message: string): Promise<{ error: string } | undefined> {
   const trimmed = message.trim();
   if (!trimmed) {
-    throw new Error("Message can't be empty.");
+    return { error: "Message can't be empty." };
   }
 
   const quote = await prisma.quote.findUniqueOrThrow({
@@ -92,20 +95,25 @@ export async function sendQuoteToCustomer(quoteId: string, message: string) {
   });
 
   if (!quote.lead.email) {
-    throw new Error("This lead doesn't have an email address on file to send the quote to.");
+    return { error: "This lead doesn't have an email address on file to send the quote to." };
   }
 
   const number = formatQuoteNumber(quote.number ?? 0);
   const { buffer, filename } = await renderQuotePdf(quoteId);
 
-  const { note } = await sendLeadEmail(quote.leadId, {
-    to: quote.lead.email,
-    fromName: quote.lead.business.name,
-    subject: `Your quote from ${quote.lead.business.name} — #${number}`,
-    text: trimmed,
-    attachment: { filename, content: buffer, contentType: "application/pdf" },
-    label: `Quote #${number}`,
-  });
+  let note: string;
+  try {
+    ({ note } = await sendLeadEmail(quote.leadId, {
+      to: quote.lead.email,
+      fromName: quote.lead.business.name,
+      subject: `Your quote from ${quote.lead.business.name} — #${number}`,
+      text: trimmed,
+      attachment: { filename, content: buffer, contentType: "application/pdf" },
+      label: `Quote #${number}`,
+    }));
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to send the quote." };
+  }
 
   // A sent quote is the real-world event the "Quote Sent" stage represents —
   // fast-forward it automatically rather than making staff remember to also
